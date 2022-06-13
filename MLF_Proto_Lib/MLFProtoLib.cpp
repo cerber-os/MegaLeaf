@@ -1,4 +1,11 @@
-
+/**
+ * @file MLFProtoLib.cpp
+ * @author Pawel Wieczorek
+ * @brief Userspace library for communiating with MegaLeaf controller
+ * @version 0.1
+ * @date 2022-06-13
+ * 
+ */
 #include "MLFProtoLib.hpp"
 
 #include <zlib.h>
@@ -47,9 +54,12 @@ static void ConfigureSerialPort(int fd) {
     if (tcgetattr (fd, &tty) != 0)
         throw std::runtime_error("Failed to get terminal attrs");
 
+    cfsetospeed(&tty, B1152000);
+    cfsetispeed(&tty, B1152000);
+
     tty.c_lflag = 0;
     tty.c_oflag = 0;
-    tty.c_cc[VMIN]  = 0;
+    tty.c_cc[VMIN]  = 1;
     tty.c_cc[VTIME] = 5;
 
     tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
@@ -94,7 +104,6 @@ void MLFProtoLib::_read(void* data, size_t len) {
         if(ret < 0)
             throw std::runtime_error("Failed to write data");
         alreadyRead += ret;
-        usleep(1000 * 300);
     }
 }
 
@@ -172,7 +181,7 @@ void MLFProtoLib::_sendData(int cmd, void* data, int len) {
  * 
  * @returns error status sent by controller
  */
-int MLFProtoLib::_recvData(char* output, int outputLen, int* actualLen) {
+int MLFProtoLib::_recvData(void* output, int outputLen, int* actualLen) {
     int ret = 0;
     struct MLF_resp_packet_header header;
     struct MLF_packet_footer footer;
@@ -181,8 +190,6 @@ int MLFProtoLib::_recvData(char* output, int outputLen, int* actualLen) {
     _read(&header, sizeof(header));
     if(header.magic != MLF_HEADER_MAGIC)
         throw std::runtime_error("Invalid header magic was received from MLF Controller");
-
-    printf("DBG: Received HDR %d %d %d\n", header.magic, header.error_code, header.data_size);
     
     // Read data associated with packet
     char* data_buffer = new char[header.data_size];
@@ -219,6 +226,11 @@ int MLFProtoLib::invokeCmd(int cmd, void* data, int len) {
     return _recvData();
 }
 
+int MLFProtoLib::invokeCmd(int cmd, void* data, int len, void* resp, int* respLen) {
+    _sendData(cmd, data, len);
+    return _recvData(resp, *respLen, respLen);
+}
+
 MLFProtoLib::MLFProtoLib(std::string path) {
     if(path == "") {
         path = GetPathToUSBDevice();
@@ -233,12 +245,33 @@ MLFProtoLib::MLFProtoLib(std::string path) {
 
     ConfigureSerialPort(dev);
 
-    // TODO: Retrieve basic info (LEDs count, etc.)
+    // Retrieve basic info
+    struct MLF_resp_cmd_get_info resp;
+    int resp_size = sizeof(resp);
+    int ret;
+
+    ret = invokeCmd(MLF_CMD_GET_INFO, nullptr, 0, &resp, &resp_size);
+    if(resp_size != sizeof(resp) || ret != MLF_RET_OK)
+        throw std::runtime_error("Failed to get info from MLF Controller");
+
+    fw_version = resp.fw_version;
+    leds_count_top = resp.leds_count_top;
+    leds_count_bottom = resp.leds_count_bottom;
 }
 
 MLFProtoLib::~MLFProtoLib() {
     close(dev);
 }
+
+void MLFProtoLib::getFWVersion(int& version) {
+    version = fw_version;
+}
+
+void MLFProtoLib::getLedsCount(int& top, int& bottom) {
+    top = leds_count_top;
+    bottom = leds_count_bottom;
+}
+
 
 void MLFProtoLib::turnOff(void) {
     invokeCmd(MLF_CMD_TURN_OFF);
@@ -247,13 +280,17 @@ void MLFProtoLib::turnOff(void) {
 void MLFProtoLib::setBrightness(int brightness) {
     int ret;
     struct MLF_req_cmd_set_brightness data = {
-        .brightness = 50,
+        .brightness = brightness,
         .strip = 0b11
     };
 
     ret = invokeCmd(MLF_CMD_SET_BRIGHTNESS, &data, sizeof data);
     if(ret != MLF_RET_OK)
         throw std::runtime_error("MLF_CMD_SET_BRIGHTNESS failed");
+}
+
+void MLFProtoLib::setColors(int* colors, int len) {
+
 }
 
 void MLFProtoLib::setEffect(int effect, int speed, int strip, int color) {
@@ -281,6 +318,6 @@ int main() {
     std::cout << "Startup\n";
     
     MLFProtoLib com;
-    com.setEffect(2, 1, 0b11, 0x0000ff);
-    com.setBrightness(30);
+    com.setEffect(2, 1, 0b11, 0x006fff);
+    com.setBrightness(20);
 }

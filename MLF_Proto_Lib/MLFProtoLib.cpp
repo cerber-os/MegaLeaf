@@ -7,6 +7,7 @@
  * 
  */
 #include "MLFProtoLib.hpp"
+#include "MLFProtoLib.h"
 
 #include <zlib.h>
 
@@ -52,7 +53,7 @@ static std::string GetPathToUSBDevice(void) {
 static void ConfigureSerialPort(int fd) {
     struct termios tty;
     if (tcgetattr (fd, &tty) != 0)
-        throw std::runtime_error("Failed to get terminal attrs");
+        throw MLFException("failed to setup usb connection - get attrs", true);
 
     cfsetospeed(&tty, B1152000);
     cfsetispeed(&tty, B1152000);
@@ -60,7 +61,7 @@ static void ConfigureSerialPort(int fd) {
     tty.c_lflag = 0;
     tty.c_oflag = 0;
     tty.c_cc[VMIN]  = 1;
-    tty.c_cc[VTIME] = 5;
+    tty.c_cc[VTIME] = 8;
 
     tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
     tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
@@ -68,7 +69,7 @@ static void ConfigureSerialPort(int fd) {
     tty.c_cflag &= ~(PARENB | PARODD | CSTOPB | CRTSCTS);
 
     if (tcsetattr (fd, TCSANOW, &tty) != 0)
-        throw std::runtime_error("Failed to set terminal attrs");
+        throw MLFException("failed to setup usb connection - set attrs", true);
 }
 
 #elif _WIN32
@@ -94,7 +95,17 @@ static std::string GetPathToUSBDevice(void) {
  * COMMUNICATION WITH CONTROLLER
  ************************************/
 
-// TODO: Timeout
+MLFException::MLFException(const char* msg, bool storeErrno) {
+    message = "MLFException occurred: " + std::string(msg);
+    if(storeErrno)
+        message += std::string(" [") + strerror(errno) + "]";
+}
+
+const char* MLFException::what(void) const noexcept {
+    return message.c_str();
+}
+
+
 void MLFProtoLib::_read(void* data, size_t len) {
     int ret;
     size_t alreadyRead = 0;
@@ -102,7 +113,10 @@ void MLFProtoLib::_read(void* data, size_t len) {
     while(alreadyRead < len) {
         ret = read(dev, data + alreadyRead, len - alreadyRead);
         if(ret < 0)
-            throw std::runtime_error("Failed to write data");
+            throw MLFException("failed to read data from MLF Controller", true);
+        else if(ret == 0)
+            throw MLFException("failed to read data from MLF Controller [Timeout]");
+
         alreadyRead += ret;
     }
 }
@@ -114,7 +128,7 @@ void MLFProtoLib::_write(void* data, size_t len) {
     while(alreadyWritten < len) {
         ret = write(dev, data + alreadyWritten, len - alreadyWritten);
         if(ret <= 0)
-            throw std::runtime_error("Failed to write data");
+            throw MLFException("failed to write data to MLF Controller", true);
         alreadyWritten += ret;
     }
 }
@@ -183,80 +197,101 @@ void MLFProtoLib::_sendData(int cmd, void* data, int len) {
  */
 int MLFProtoLib::_recvData(void* output, int outputLen, int* actualLen) {
     int ret = 0;
+    char* data_buffer = NULL;
     struct MLF_resp_packet_header header;
     struct MLF_packet_footer footer;
 
     // Read header
     _read(&header, sizeof(header));
     if(header.magic != MLF_HEADER_MAGIC)
-        throw std::runtime_error("Invalid header magic was received from MLF Controller");
+        throw MLFException("invalid header magic was received from MLF Controller");
     
-    // Read data associated with packet
-    char* data_buffer = new char[header.data_size];
-    _read(data_buffer, header.data_size);
-    
-    // Read footer
-    _read(&footer, sizeof(footer));    
-    if(footer.magic != MLF_FOOTER_MAGIC)
-        throw std::runtime_error("Invalid footer magic was received from MLF Controller");
+    try {
+        // Read data associated with packet
+        data_buffer = new char[header.data_size];
+        _read(data_buffer, header.data_size);
+        
+        // Read footer
+        _read(&footer, sizeof(footer));    
+        if(footer.magic != MLF_FOOTER_MAGIC)
+            throw MLFException("invalid footer magic was received from MLF Controller");
 
-    // Validate CRC checksum
-    int received_crc = _calcCRC(&header, sizeof header);
-    received_crc = _appendCRC(received_crc, data_buffer, header.data_size);
-    if(received_crc != footer.crc)
-        ;
-    // TODO: Fix CRC mismatch
-    //    throw std::runtime_error("Incorrect CRC in packet received from MLF Controller");
+        // Validate CRC checksum
+        int received_crc = _calcCRC(&header, sizeof header);
+        received_crc = _appendCRC(received_crc, data_buffer, header.data_size);
+        if(received_crc != footer.crc)
+            ;
+            // TODO: Fix CRC mismatch
+            //    throw std::runtime_error("Incorrect CRC in packet received from MLF Controller");
 
-    // Copy result
-    if(outputLen > header.data_size)
-        outputLen = header.data_size;
-    if(actualLen != nullptr)
-        *actualLen = header.data_size;
-    if(output != nullptr)
-        memcpy(output, data_buffer, outputLen);
+        // Copy result
+        if(outputLen > header.data_size)
+            outputLen = header.data_size;
+        if(actualLen != nullptr)
+            *actualLen = header.data_size;
+        if(output != nullptr)
+            memcpy(output, data_buffer, outputLen);
+    } catch (...) {
+        delete[] data_buffer;
+        throw ;
+    }
 
-    // TODO: Fix memory leak when exception is thrown
     delete[] data_buffer;
     return header.error_code;
 }
 
 int MLFProtoLib::invokeCmd(int cmd, void* data, int len) {
+    int ret;
+
     _sendData(cmd, data, len);
-    return _recvData();
+    ret = _recvData();
+    if(ret != MLF_RET_OK)
+        throw MLFException("unexpected return code has been received");
+    return ret;
 }
 
 int MLFProtoLib::invokeCmd(int cmd, void* data, int len, void* resp, int* respLen) {
+    int ret;
+
     _sendData(cmd, data, len);
-    return _recvData(resp, *respLen, respLen);
+    ret = _recvData(resp, *respLen, respLen);
+    if(ret != MLF_RET_OK)
+        throw MLFException("unexpected return code has been received");
+    return ret;
 }
 
 MLFProtoLib::MLFProtoLib(std::string path) {
+    int ret;
+
     if(path == "") {
         path = GetPathToUSBDevice();
         if(path == "")
-            throw std::runtime_error("Failed to locate MLF Controller");
+            throw MLFException("failed to locate MLF Controller");
     }
     device_name = path;
 
     dev = open(path.c_str(), O_RDWR);
     if(dev < 0)
-        throw std::runtime_error("Failed to open MLF Controller device");
+        throw MLFException("failed to open MLF Controller device", true);
 
-    ConfigureSerialPort(dev);
+    try {
+        ConfigureSerialPort(dev);
 
-    // Retrieve basic info
-    struct MLF_resp_cmd_get_info resp;
-    int resp_size = sizeof(resp);
-    int ret;
+        // Retrieve basic info
+        struct MLF_resp_cmd_get_info resp;
+        int resp_size = sizeof(resp);
 
-    ret = invokeCmd(MLF_CMD_GET_INFO, nullptr, 0, &resp, &resp_size);
-    if(resp_size != sizeof(resp) || ret != MLF_RET_OK)
-        throw std::runtime_error("Failed to get info from MLF Controller");
+        ret = invokeCmd(MLF_CMD_GET_INFO, nullptr, 0, &resp, &resp_size);
+        if(resp_size != sizeof(resp))
+            throw MLFException("failed to get info from MLF Controller");
 
-    fw_version = resp.fw_version;
-    leds_count_top = resp.leds_count_top;
-    leds_count_bottom = resp.leds_count_bottom;
+        fw_version = resp.fw_version;
+        leds_count_top = resp.leds_count_top;
+        leds_count_bottom = resp.leds_count_bottom;
+    } catch(...) {
+        close(dev);
+        throw ;
+    }
 }
 
 MLFProtoLib::~MLFProtoLib() {
@@ -278,23 +313,25 @@ void MLFProtoLib::turnOff(void) {
 }
 
 void MLFProtoLib::setBrightness(int brightness) {
-    int ret;
     struct MLF_req_cmd_set_brightness data = {
         .brightness = brightness,
         .strip = 0b11
     };
 
-    ret = invokeCmd(MLF_CMD_SET_BRIGHTNESS, &data, sizeof data);
-    if(ret != MLF_RET_OK)
-        throw std::runtime_error("MLF_CMD_SET_BRIGHTNESS failed");
+    invokeCmd(MLF_CMD_SET_BRIGHTNESS, &data, sizeof data);
 }
 
 void MLFProtoLib::setColors(int* colors, int len) {
+    const int dataLen = sizeof(struct MLF_req_cmd_set_color) + sizeof(int) * len;
+    struct MLF_req_cmd_set_color* data = NULL;
+    data = (struct MLF_req_cmd_set_color*) new char[dataLen];
 
+    memcpy(data->colors, colors, len * sizeof(int));
+
+    invokeCmd(MLF_CMD_SET_COLOR, &data, dataLen);
 }
 
 void MLFProtoLib::setEffect(int effect, int speed, int strip, int color) {
-    int ret;
     struct MLF_req_cmd_set_effect data = {
         .effect = effect,
         .speed = speed,
@@ -302,16 +339,91 @@ void MLFProtoLib::setEffect(int effect, int speed, int strip, int color) {
         .color = color,
     };
 
-    ret = invokeCmd(MLF_CMD_SET_EFFECT, &data, sizeof data);
-    if(ret != MLF_RET_OK)
-        throw std::runtime_error("MLD_CMD_SET_EFFECT failed");
+    invokeCmd(MLF_CMD_SET_EFFECT, &data, sizeof data);
 }
 
+
+/************************************
+ * C bindings
+ ************************************/
+#define MLF_PROTO_OBJ(X)  ((MLFProtoLib*)X)
+
+MLF_handler MLFProtoLib_Init(char* path) {
+    try {
+        return new MLFProtoLib(path);
+    } catch (...) {
+        return NULL;
+    }
+}
+
+void MLFProtoLib_Deinit(MLF_handler handle) {
+    try {
+        delete handle;
+    } catch (...) {
+        ;
+    }
+}
+
+void MLFProtoLib_GetFWVersion(MLF_handler handle, int* version) {
+    try {
+        int ver;
+        MLF_PROTO_OBJ(handle)->getFWVersion(ver);
+        *version = ver;
+    } catch (...) {
+        ;
+    }
+}
+void MLFProtoLib_GetLedsCount(MLF_handler handle, int* top, int* bottom) {
+    try {
+        int t, b;
+        MLF_PROTO_OBJ(handle)->getLedsCount(t, b);
+        *top = t;
+        *bottom = b;
+    } catch (...) {
+        ;
+    }
+}
+
+int MLFProtoLib_TurnOff(MLF_handler handle) {
+    try {
+        MLF_PROTO_OBJ(handle)->turnOff();
+        return 0;
+    } catch (...) {
+        return -1;
+    }
+}
+
+int MLFProtoLib_SetBrightness(MLF_handler handle, int val) {
+    try {
+        MLF_PROTO_OBJ(handle)->setBrightness(val);
+        return 0;
+    } catch (...) {
+        return -1;
+    }
+}
+
+int MLFProtoLib_SetColors(MLF_handler handle, int* colors, int len) {
+    try {
+        MLF_PROTO_OBJ(handle)->setColors(colors, len);
+        return 0;
+    } catch (...) {
+        return -1;
+    }
+}
+
+int MLFProtoLib_SetEffect(MLF_handler handle, int effect, int speed, int strip, int color) {
+    try {
+        MLF_PROTO_OBJ(handle)->setEffect(effect, speed, strip, color);
+        return 0;
+    } catch (...) {
+        return -1;
+    }
+}
 
 
 /*************
  * TEMP
- * **************88*/
+ * ***********/
 #include <iostream>
 
 int main() {

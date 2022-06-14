@@ -4,7 +4,23 @@
 #include <cstdio>
 #include <string>
 
+/**
+ * @brief 
+ * 
+ */
+class MLFException : std::exception {
+    /* Exception message */
+    std::string message;
 
+public:
+    MLFException(const char* msg, bool storeErrno = false);
+    const char* what(void) const noexcept;
+};
+
+/**
+ * @brief 
+ * 
+ */
 class MLFProtoLib {
     /* Char device used to communicate with device */
     int dev;
@@ -12,8 +28,12 @@ class MLFProtoLib {
     /* Path to file pointed by `dev` member (for debug purpose) */
     std::string device_name;
 
+    /* */
     int leds_count_top, leds_count_bottom;
+
+    /* */
     int fw_version;
+
 
     void _read(void* data, size_t len);
     void _write(void* data, size_t len);

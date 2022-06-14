@@ -6,6 +6,11 @@
  * 
  */
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief MLFProtoLib object handler
  * 
@@ -84,3 +89,7 @@ int MLFProtoLib_SetColors(MLF_handler handle, int* colors, int len);
  * @return int   0 on success, -1 otherwise
  */
 int MLFProtoLib_SetEffect(MLF_handler handle, int effect, int speed, int strip, int color);
+
+#ifdef __cplusplus
+}
+#endif

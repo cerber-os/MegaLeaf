@@ -414,22 +414,3 @@ int MLFProtoLib_SetEffect(MLF_handler handle, int effect, int speed, int strip, 
         return -1;
     }
 }
-
-
-/*************
- * TEMP
- * ***********/
-#include <iostream>
-
-int main() {
-    std::cout << "Startup\n";
-    
-    try {
-        MLFProtoLib com;
-        com.setEffect(2, 1, 0b11, 0x006fff);
-        com.setBrightness(20);
-    } catch (MLFException& e) {
-        std::cout << "Fuck: " << e.what() << "\n";
-        throw;
-    }
-}

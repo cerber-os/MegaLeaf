@@ -2,7 +2,7 @@ from ctypes import *
 from typing import Tuple
 
 
-_MLF_LIBRARY = cdll.LoadLibrary("./MLFProtoLib.so")
+_MLF_LIBRARY = cdll.LoadLibrary("./output/libMLFProtoLib.so")
 
 ################################
 # ENTRY POINTS HEADERS
@@ -49,7 +49,7 @@ class MLFExcetion(Exception):
 class MLFProtoLib:
     def __init__(self, path: str = ""):
         self._handle = _MLF_LIBRARY.MLFProtoLib_Init(path.encode())
-        if self._handle == 0:
+        if self._handle == 0 or self._handle is None:
             raise MLFExcetion("Failed to initialize MLFProtoLib module")
 
     def __del__(self):
@@ -85,18 +85,18 @@ class MLFProtoLib:
             raise MLFExcetion("Failed to change color of MLF panel")
         
 
-    def setEffect(self, effect: int, speed: int, strip: int, color: int):
+    def setEffect(self, effect: int, speed: int = 0, strip: int = 0b11, color: int = 0):
         ret = _MLF_LIBRARY.MLFProtoLib_SetEffect(self._handle, effect, speed, strip, color)
         if ret != 0:
             raise MLFExcetion("Failed to set effect on MLF panel")
 
 
-# Test area
+# Test area 
 controller = MLFProtoLib()
 fw_version = controller.getFWVersion()
 count = controller.getLedsCount()
 print(f'FW version: {fw_version}')
 print(f'Leds count: {count[0]} and {count[1]}')
 
-controller.setEffect(2, 0, 0b11, 0x00ffff)
-controller.setBrightness(127)
+controller.setEffect(0, 9)
+controller.setBrightness(200)

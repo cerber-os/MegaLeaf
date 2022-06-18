@@ -9,6 +9,8 @@
 #include "MLFProtoLib.hpp"
 #include "MLFProtoLib.h"
 
+#include <fcntl.h>
+
 /************************************
  * PLATFORM SPECIFIC CODE
  ************************************/
@@ -70,15 +72,85 @@ static void ConfigureSerialPort(int fd) {
 
 #elif _WIN32
 
+/* Windows specific include files */
+#include <windows.h>
+
+#include <initguid.h>
+#include <devpropdef.h>
+#include <devpkey.h>
+#include <io.h>
+#include <setupapi.h>
+
+/* Const string identifier used by MLF controller during USB enumeration */
+#define BUS_NAME_PREFIX        "USB Serial Device ("
+
 /**
- * @brief Get the path to MLF Controller USB device
- * 
- * @return std::string resolved path to COM port or empty string if not found
- */
+* @brief Get the path to MLF Controller USB device
+*
+* @return std::string resolved path to COM port or empty string if not found
+*/
 static std::string GetPathToUSBDevice(void) {
-    // TODO: Add support for windows COM port discovery
-    return "";
+    std::string result = "";
+    DWORD size, ret;
+    HDEVINFO devInfoSet;
+    SP_DEVINFO_DATA devInfoData = { 0 };
+    DEVPROPTYPE PropType;
+    wchar_t buffer[128] = { 0 };
+    char friendlyName[256] = { 0 };
+
+    devInfoSet = SetupDiGetClassDevs(NULL, NULL, NULL, DIGCF_ALLCLASSES | DIGCF_PRESENT);
+    devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+
+    // Iterate over all available devices
+    for (UINT idx = 0; SetupDiEnumDeviceInfo(devInfoSet, idx, &devInfoData); idx++) {
+
+        // Extract Bus Reported Device Description
+        ret = SetupDiGetDeviceProperty(devInfoSet, &devInfoData,
+            &DEVPKEY_Device_BusReportedDeviceDesc, &PropType, (PBYTE)buffer,
+            sizeof(buffer), &size, 0);
+        if (!ret || PropType != DEVPROP_TYPE_STRING)
+            continue;
+
+        // Ignore all devices except MLF Controller
+        if (wcscmp(buffer, L"MegaLeaf CDC Controller") != 0)
+            continue;
+
+        // Extract Device Friendly Name
+        // The name is of format "USB Serial Device (COMXXX)"
+        //  from which COM port number could be extracted
+        ret = SetupDiGetDeviceProperty(devInfoSet, &devInfoData,
+            &DEVPKEY_Device_FriendlyName, &PropType, (PBYTE)buffer,
+            sizeof(buffer), &size, 0);
+        if (!ret || PropType != DEVPROP_TYPE_STRING) {
+            goto exit;
+        }
+
+        size_t size;
+        wcstombs_s(&size, friendlyName, buffer, sizeof(friendlyName));
+        if (size < sizeof(BUS_NAME_PREFIX) + 2) {
+            goto exit;
+        }
+
+        friendlyName[size - 2] = '\0';
+        result = std::string(&friendlyName[sizeof(BUS_NAME_PREFIX) - 1]) + ":";
+    }
+
+exit:
+    if (devInfoSet)
+        SetupDiDestroyDeviceInfoList(devInfoSet);
+    return result;
 }
+
+/* On Windows there's no need for an additional configuration of serial port*/
+static void ConfigureSerialPort(int fd) {
+    (fd);
+}
+
+/* Nasty fix to overcome "Posix name deprecated" error */
+#define open        ::_open
+#define read        ::_read
+#define write       ::_write
+#define close       ::_close
 
 #else
 

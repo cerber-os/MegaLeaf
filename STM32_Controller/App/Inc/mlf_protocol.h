@@ -8,6 +8,12 @@
 
 #include <stdint.h>
 
+#ifdef _MSC_VER
+	#define PACKED
+	__pragma(pack(push, 1))
+#else
+	#define PACKED	__attribute__((packed))
+#endif
 
 /**********************
  * MLF PROTOCOL DEFINITION
@@ -49,19 +55,19 @@ struct MLF_req_packet_header {
 	uint8_t		cmd;
 	uint16_t	data_size;
 	uint8_t		data[0];
-} __attribute__((packed));
+} PACKED;
 
 struct MLF_resp_packet_header {
 	uint32_t 	magic;
 	uint8_t		error_code;
 	uint16_t 	data_size;
 	uint8_t		data[0];
-} __attribute__((packed));
+} PACKED;
 
 struct MLF_packet_footer {
 	uint32_t crc;
 	uint32_t magic;
-} __attribute__((packed));
+} PACKED;
 
 
 /*
@@ -71,7 +77,7 @@ struct MLF_resp_cmd_get_info {
 	uint8_t fw_version;
 	uint16_t leds_count_top;
 	uint16_t leds_count_bottom;
-} __attribute__((packed));
+} PACKED;
 
 /*
  * MLF_CMD_SET_BRIGHTNESS
@@ -81,7 +87,7 @@ struct MLF_resp_cmd_get_info {
 struct MLF_req_cmd_set_brightness {
 	uint8_t brightness;
 	uint8_t strip;
-} __attribute__((packed));
+} PACKED;
 
 /*
  * MLF_CMD_SET_COLOR
@@ -91,7 +97,7 @@ struct MLF_req_cmd_set_brightness {
 struct MLF_req_cmd_set_color {
 	uint8_t strip;
 	uint8_t colors[0];
-} __attribute__((packed));
+} PACKED;
 
 /*
  * MLF_CMD_SET_EFFECT
@@ -108,7 +114,7 @@ struct MLF_req_cmd_set_effect {
 	uint8_t speed;
 	uint8_t strip;
 	uint32_t color;
-} __attribute__((packed));
+} PACKED;
 
 
 /**********************
@@ -130,5 +136,9 @@ int MLF_init(void);
 int MLF_is_packet_available(void);
 void MLF_process_packet(void);
 void MLF_register_callback(enum MLF_commands cmd, MLF_command_handler cb);
+
+#ifdef _MSC_VER
+	__pragma(pack(pop))
+#endif
 
 #endif /* INC_MLF_PROTOCOL_H_ */

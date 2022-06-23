@@ -41,4 +41,6 @@ void refresh_leds(struct LEDStrip* strip);
 void clear_leds(struct LEDStrip* strip);
 void set_leds_brightness(struct LEDStrip* strip, uint8_t brightness);
 
+struct Color int2Color(int color);
+
 #endif /* INC_WS2812_H_ */

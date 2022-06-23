@@ -28,6 +28,7 @@ extern SPI_HandleTypeDef hspi3;
 enum APP_OP_MODE {
 	TURN_OFF    = 0,
 	SHOW_EFFECT,
+	SHOW_COLORS,
 
 	MAX_OP_MODE,
 } app_mode;
@@ -79,7 +80,6 @@ int app_set_effect(uint8_t* data, uint16_t len, uint8_t* resp, uint16_t* resp_le
 	if(cmd_data->effect >= EFFECT_MAX)
 		return MLF_RET_INVALID_DATA;
 
-	app_mode = SHOW_EFFECT;
 	cur_effect_speed = cmd_data->speed + 1;
 	if(cmd_data->strip & STRIP_TOP) {
 		cur_effect_top = cmd_data->effect;
@@ -90,9 +90,34 @@ int app_set_effect(uint8_t* data, uint16_t len, uint8_t* resp, uint16_t* resp_le
 		cur_effect_bottom_data = cmd_data->color;
 	}
 
+	app_mode = SHOW_EFFECT;
 	return MLF_RET_OK;
 }
 
+int app_set_color(uint8_t* data, uint16_t len, uint8_t* resp, uint16_t* resp_len) {
+	int* leds = (int*)(data + sizeof(struct MLF_req_cmd_set_color));
+	int upperLedsCnt, bottomLedsCnt;
+	struct MLF_req_cmd_set_color* cmd_data = (struct MLF_req_cmd_set_color*) data;
+
+	if(len < sizeof(*cmd_data))
+		return MLF_RET_INVALID_DATA;
+	len -= sizeof(*cmd_data);
+
+	upperLedsCnt = get_leds_count(led_strip_upper);
+	bottomLedsCnt = get_leds_count(led_strip_bottom);
+
+	for(int i = 0; i < len / 4; i++) {
+		if(i >= bottomLedsCnt + upperLedsCnt)
+			break;
+		else if(i >= bottomLedsCnt)
+			set_led_color(led_strip_upper, i - bottomLedsCnt, int2Color(leds[i]));
+		else
+			set_led_color(led_strip_bottom, i, int2Color(leds[i]));
+	}
+
+	app_mode = SHOW_COLORS;
+	return MLF_RET_OK;
+}
 
 /***********************
  * EXPORTED FUNCTIONS
@@ -114,6 +139,7 @@ void app_init(void) {
 	MLF_register_callback(MLF_CMD_TURN_OFF, app_turn_off);
 	MLF_register_callback(MLF_CMD_SET_EFFECT, app_set_effect);
 	MLF_register_callback(MLF_CMD_SET_BRIGHTNESS, app_set_brightness);
+	MLF_register_callback(MLF_CMD_SET_COLOR, app_set_color);
 }
 
 
@@ -146,6 +172,9 @@ void app_main_loop(void) {
 			refresh |= run_effect_frame(led_strip_upper, cur_effect_top, frame, cur_effect_top_data);
 			refresh |= run_effect_frame(led_strip_bottom, cur_effect_bottom, frame, cur_effect_bottom_data);
 			frame += cur_effect_speed;
+			break;
+		case SHOW_COLORS:
+			// Everything is already done by a handler
 			break;
 
 		default:

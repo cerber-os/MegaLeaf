@@ -67,5 +67,3 @@ void USB_FS_IRQHandler(void);
 #endif
 
 #endif /* __STM32L5xx_IT_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

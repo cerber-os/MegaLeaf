@@ -94,10 +94,10 @@ uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 /** Data to send over USB CDC are stored in this buffer   */
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
-/** Structure storing parts of packet sent by user 		  */
-struct packet_buffer* packet_buf;
-
 /* USER CODE BEGIN PRIVATE_VARIABLES */
+
+/** Structure storing parts of packet sent by user               */
+struct packet_buffer* packet_buf;
 
 /* USER CODE END PRIVATE_VARIABLES */
 
@@ -272,13 +272,10 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  printf("{USB} RECV[%ld]: %hx%hx%hx%hx\n", *Len, Buf[0], Buf[1], Buf[2], Buf[3]);
-
   int ret = packet_buffer_append(packet_buf, Buf, *Len);
   if(ret)
 	  ;	// TODO: Consider returning USBD_FAIL
 
-  // TODO: Consider using setRXBuffer + offset instead of custom packet_buffer XD
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
 
@@ -346,4 +343,3 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
   * @}
   */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

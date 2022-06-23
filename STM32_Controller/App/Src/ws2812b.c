@@ -107,7 +107,10 @@ void set_led_color(struct LEDStrip* strip, int idx, struct Color color) {
 void refresh_leds(struct LEDStrip* strip) {
 	int ret;
 
+	__disable_irq();
 	ret = HAL_SPI_Transmit(strip->spi, strip->_data_buffer, SPI_BUF_LEN(strip->len), SPI_MAX_DELAY);
+	__enable_irq();
+
 	if(ret != HAL_OK) {
 		printf("|%s| HAL_SPI_Transmit returned with an error - %d\n", __func__, ret);
 	}
@@ -119,4 +122,13 @@ void clear_leds(struct LEDStrip* strip) {
 
 void set_leds_brightness(struct LEDStrip* strip, uint8_t brightness) {
 	strip->brightness = brightness;
+}
+
+struct Color int2Color(int color) {
+	struct Color c = {
+			.r = color & 0xff,
+			.g = color >> 8,
+			.b = color >> 16,
+	};
+	return c;
 }

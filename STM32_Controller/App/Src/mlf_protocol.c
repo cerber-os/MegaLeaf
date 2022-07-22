@@ -12,8 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern CRC_HandleTypeDef hcrc;
-
 static void MLF_resp_error(enum MLF_error_codes error);
 static int MLF_validate_header(uint8_t* buf);
 static int MLF_validate_footer(uint8_t* buf);
@@ -25,14 +23,6 @@ static void MLF_submit_packet(uint8_t* buf, uint32_t len);
 #define LOG_INFO(MSG, ...)		printf("[INFO] |%s| " MSG "\n", __func__, ##__VA_ARGS__);
 #define LOG_WARN(MSG, ...)		printf("[WARN] |%s| " MSG "\n", __func__, ##__VA_ARGS__);
 #define LOG_ERROR(MSG, ...)		printf("[ERROR]|%s| " MSG "\n", __func__, ##__VA_ARGS__);
-
-void hexdump(uint8_t* data, size_t len) {
-	for(int i = 0; i < len; i++) {
-		unsigned int x = data[i];
-		printf("%02x", x);
-	}
-	printf("\n");
-}
 
 /**********************
  * PACKET BUFFER SUPPORT
@@ -166,9 +156,6 @@ static void MLF_resp_error(enum MLF_error_codes error) {
 			.magic = MLF_FOOTER_MAGIC
 	};
 
-	int crcLen = (sizeof header & 0xfffffffc) / 4;
-	footer.crc = ~ HAL_CRC_Calculate(&hcrc, (uint32_t*) &header, crcLen);
-
 	uint8_t output_buffer[sizeof header + sizeof footer];
 	memcpy(output_buffer, &header, sizeof(header));
 	memcpy(output_buffer + sizeof header, &footer, sizeof(footer));
@@ -176,17 +163,17 @@ static void MLF_resp_error(enum MLF_error_codes error) {
 	ret = CDC_Transmit_FS(output_buffer, sizeof output_buffer);
 	if(ret)
 		LOG_ERROR("Failed to send error reponse - CDC_Transmit_FS returned %d", ret);
-		// We're in interrupt context here, so there's literally nth we could do about
+		// We might be in interrupt context here, so there's literally nth we could do about
 		//  this error. Normally, if it's USB_BUSY error, we would sleep a while, but
 		//  here, it's better to just give up
+		// TODO: Check if we're really in interrupt context
 }
 
 #define MAX_OUTPUT_SIZE (sizeof(struct MLF_resp_packet_header) + sizeof(struct MLF_packet_footer) + 1024)
 
-uint8_t output_buffer[MAX_OUTPUT_SIZE];
+static uint8_t output_buffer[MAX_OUTPUT_SIZE];
 static void MLF_resp_data(enum MLF_error_codes error, uint8_t* buf, uint16_t len) {
 	int ret = 0;
-	int crcLen;
 	int delay = MAX_RESPONSE_DELAY;
 	struct MLF_resp_packet_header header = {
 			.magic = MLF_HEADER_MAGIC,
@@ -206,10 +193,6 @@ static void MLF_resp_data(enum MLF_error_codes error, uint8_t* buf, uint16_t len
 
 	memcpy(output_buffer, &header, sizeof header);
 	memcpy(output_buffer + sizeof header, buf, len);
-
-	crcLen = (sizeof header + len) & 0xfffffffc;
-	crcLen /= 4;
-	footer.crc = ~ HAL_CRC_Calculate(&hcrc, (uint32_t*) output_buffer, crcLen);
 	memcpy(output_buffer + sizeof header + len, &footer, sizeof footer);
 
 	while(delay--) {
@@ -254,39 +237,22 @@ static int MLF_validate_header(uint8_t* buf) {
 }
 
 static int MLF_validate_footer(uint8_t* buf) {
-	uint32_t crc, crcLen;
 	struct MLF_req_packet_header* pkt = (struct MLF_req_packet_header*) buf;
 	struct MLF_packet_footer* footer;
 
 	footer = (struct MLF_packet_footer*)(buf + sizeof(*pkt) + pkt->data_size);
 
 	if(footer->magic != MLF_FOOTER_MAGIC) {
-		LOG_ERROR("Footer with invalid magic was received - received [%lx]; expected [%x]",
+		LOG_ERROR("Footer with invalid magic was received - received [%lx]; expected [%lx]",
 					footer->magic, MLF_FOOTER_MAGIC);
 		MLF_resp_error(MLF_RET_INVALID_FOOTER);
 		return 1;
-	}
-
-	// Round to the closest full word boundary and convert to the number of 32-bit words
-	crcLen = (sizeof(*pkt) + pkt->data_size) & 0xfffffffc;
-	crcLen /= 4;
-
-	crc = HAL_CRC_Calculate(&hcrc, (uint32_t*)buf, crcLen);
-	crc = ~crc;
-	if(crc != footer->crc) {
-		LOG_ERROR("CRC mismatch - local [%lx]; received [%lx]", crc, footer->crc);
-		long unsigned int testData = 0;
-		printf("CRC test - 0x00000000: %lx\n", HAL_CRC_Calculate(&hcrc, &testData, sizeof(testData) / 4));
-		// MLF_resp_error(MLF_RET_CRC_FAIL);
-		// TODO: IGNORE temporarilt
-		// return 1;
 	}
 
 	return 0;
 }
 
 static void MLF_submit_packet(uint8_t* buf, uint32_t len) {
-	// LOG_INFO("New packet submitted: len=%lu", len);
 
 	if(!recv_packet_buf)
 		return;
@@ -316,7 +282,6 @@ void MLF_process_packet(void) {
 
 	hdr = (struct MLF_req_packet_header*) recv_packet_buf;
 
-	//LOG_INFO("Processing new packet for command %d", hdr->cmd);
 	if(MLF_operations[hdr->cmd] != NULL)
 		ret = MLF_operations[hdr->cmd](hdr->data, hdr->data_size, response, &response_size);
 	if(ret != MLF_RET_OK)

@@ -8,7 +8,6 @@
 #include "MLFProtoLib.h"
 
 #include <fcntl.h>
-#include "CRC.h"
 
 
 /************************************
@@ -226,20 +225,12 @@ void MLFProtoLib::_write(void* data, size_t len) {
     }
 }
 
-int MLFProtoLib::_calcCRC(void* data, int len) {
-    return CRC::Calculate(data, len, CRC::CRC_32());
-}
-
-int MLFProtoLib::_appendCRC(int crc, void* data, int len) {
-    return CRC::Calculate(data, len, CRC::CRC_32(), (uint32_t)crc);
-}
-
 /*
  * Packets from host to controller looks as follow:
  *  |   HEADER   |   BODY   |   FOOTER   |
  *  , where HEADER contains: magic, command no., body size
  *          BODY contains command specific data
- *          FOOTER contains: CRC checksum of HEADER+BODY, magic
+ *          FOOTER contains: magic
  */
 
  /**
@@ -263,10 +254,6 @@ void MLFProtoLib::_sendData(int cmd, void* data, int len) {
     char* packet = new char[packet_size];
     memcpy(packet, &header, sizeof header);
     memcpy(packet + sizeof header, data, len);
-
-    // Calculate CRC of header + body and add it to packet footer
-    int crcLen = (sizeof header + len) & 0xfffffffc;
-    footer.crc = _calcCRC(packet, crcLen);
     memcpy(packet + sizeof header + len, &footer, sizeof footer);
 
 
@@ -308,13 +295,6 @@ int MLFProtoLib::_recvData(void* output, int outputLen, int* actualLen) {
         _read(&footer, sizeof(footer));
         if(footer.magic != MLF_FOOTER_MAGIC)
             throw MLFException("invalid footer magic was received from MLF Controller");
-
-        // Validate CRC checksum
-        int received_crc = _calcCRC(&header, sizeof header);
-        received_crc = _appendCRC(received_crc, data_buffer, header.data_size);
-        if(received_crc != (int)footer.crc)
-            ;
-        //    TODO: throw std::runtime_error("Incorrect CRC in packet received from MLF Controller");
 
         // Copy result
         if(outputLen > header.data_size)

@@ -40,8 +40,7 @@ enum MLF_error_codes {
 	MLF_RET_OK				= 0,
 	MLF_RET_PING			= 1,
 
-	MLF_RET_CRC_FAIL		= 128,
-	MLF_RET_INVALID_CMD,
+	MLF_RET_INVALID_CMD		= 128,
 	MLF_RET_INVALID_HEADER,
 	MLF_RET_INVALID_DATA,
 	MLF_RET_INVALID_FOOTER,
@@ -65,7 +64,6 @@ struct MLF_resp_packet_header {
 } PACKED;
 
 struct MLF_packet_footer {
-	uint32_t crc;
 	uint32_t magic;
 } PACKED;
 

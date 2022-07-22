@@ -15,7 +15,8 @@ extern "C"
  * @brief MLFProtoLib object handler
  * 
  */
-typedef void* MLF_handler;
+struct MLF_C_Object;
+typedef MLF_C_Object *MLF_handler;
 
 /**
  * @brief Initializes MLFProtoLib object
@@ -89,6 +90,14 @@ int MLFProtoLib_SetColors(MLF_handler handle, int* colors, int len);
  * @return int   0 on success, -1 otherwise
  */
 int MLFProtoLib_SetEffect(MLF_handler handle, int effect, int speed, int strip, int color);
+
+/**
+ * @brief Retrieve the last error reported by library
+ * 
+ * @param handle MLFProtoLib handler
+ * @return const char* string containing error content
+ */
+const char* MLFProtoLib_GetError(MLF_handler handle);
 
 #ifdef __cplusplus
 }

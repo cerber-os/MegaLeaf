@@ -10,7 +10,7 @@
  * 
  */
 class MLFException : std::exception {
-    /* Exception message */
+
     std::string message;
 
 public:
@@ -29,10 +29,7 @@ class MLFProtoLib {
     /* Path to file pointed by `dev` member (for debug purpose) */
     std::string device_name;
 
-    /* */
     int leds_count_top, leds_count_bottom;
-
-    /* */
     int fw_version;
 
 
@@ -46,12 +43,14 @@ class MLFProtoLib {
     int  invokeCmd(int cmd, void* data = nullptr, int len = 0);
     int  invokeCmd(int cmd, void* data, int len, void* resp, int* respLen);
 
+    void errorToException(const char* message, int error);
+
 public:
     MLFProtoLib(std::string path = "");
     ~MLFProtoLib();
 
-    void getFWVersion(int& version);
-    void getLedsCount(int& top, int& bottom);
+    void getFWVersion(int& version) const;
+    void getLedsCount(int& top, int& bottom) const;
 
     void turnOff(void);
     void setBrightness(int brightness);

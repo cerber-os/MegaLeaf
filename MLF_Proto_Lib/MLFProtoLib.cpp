@@ -319,7 +319,7 @@ int MLFProtoLib::invokeCmd(int cmd, void* data, int len) {
     _sendData(cmd, data, len);
     ret = _recvData();
     if(ret != MLF_RET_OK)
-        throw MLFException("unexpected return code has been received");
+        errorToException("contoller failed to process command", ret);
     return ret;
 }
 
@@ -329,9 +329,31 @@ int MLFProtoLib::invokeCmd(int cmd, void* data, int len, void* resp, int* respLe
     _sendData(cmd, data, len);
     ret = _recvData(resp, *respLen, respLen);
     if(ret != MLF_RET_OK)
-        throw MLFException("unexpected return code has been received");
+        errorToException("contoller failed to process command", ret);
     return ret;
 }
+
+void MLFProtoLib::errorToException(const char* message, int error) {
+    #define CASE_WRAP(X, S)     case X: errorStr = S; break
+
+    const char* errorStr = nullptr;
+    switch(error) {
+        CASE_WRAP(MLF_RET_INVALID_CMD, "invalid command");
+        CASE_WRAP(MLF_RET_INVALID_HEADER, "malformed header");
+        CASE_WRAP(MLF_RET_INVALID_DATA, "invalid data");
+        CASE_WRAP(MLF_RET_INVALID_FOOTER, "malformed footer");
+        CASE_WRAP(MLF_RET_NOT_READY, "device not ready");
+        CASE_WRAP(MLF_RET_TIMEOUT, "timeout");
+        CASE_WRAP(MLF_RET_DATA_TOO_LARGE, "data too large");
+        default:
+            errorStr = "unknown error";
+            break;
+    }
+
+    std::string exceptionMsg = std::string(message) + errorStr;
+    throw MLFException(exceptionMsg.c_str());
+}
+
 
 MLFProtoLib::MLFProtoLib(std::string path) {
     if(path == "") {
@@ -370,11 +392,11 @@ MLFProtoLib::~MLFProtoLib() {
     close(dev);
 }
 
-void MLFProtoLib::getFWVersion(int& version) {
+void MLFProtoLib::getFWVersion(int& version) const {
     version = fw_version;
 }
 
-void MLFProtoLib::getLedsCount(int& top, int& bottom) {
+void MLFProtoLib::getLedsCount(int& top, int& bottom) const {
     top = leds_count_top;
     bottom = leds_count_bottom;
 }
@@ -426,11 +448,18 @@ void MLFProtoLib::setEffect(int effect, int speed, int strip, int color) {
 /************************************
  * C bindings
  ************************************/
-#define MLF_PROTO_OBJ(X)  ((MLFProtoLib*)X)
+struct MLF_C_Object {
+    MLFProtoLib* instance;
+    const char* exceptionMessage;
+};
+
 
 MLF_handler MLFProtoLib_Init(char* path) {
     try {
-        return new MLFProtoLib(path);
+        MLF_handler handle = new MLF_C_Object;
+        handle->instance = new MLFProtoLib(path);
+        handle->exceptionMessage = NULL;
+        return handle;
     }
     catch (...) {
         return NULL;
@@ -438,8 +467,13 @@ MLF_handler MLFProtoLib_Init(char* path) {
 }
 
 void MLFProtoLib_Deinit(MLF_handler handle) {
+    if(handle == NULL)
+        return;
+    
     try {
-        delete (MLFProtoLib*)handle;
+        free((void*) handle->exceptionMessage);
+        delete handle->instance;
+        delete handle;
     }
     catch (...) {
         ;
@@ -449,7 +483,7 @@ void MLFProtoLib_Deinit(MLF_handler handle) {
 void MLFProtoLib_GetFWVersion(MLF_handler handle, int* version) {
     try {
         int ver;
-        MLF_PROTO_OBJ(handle)->getFWVersion(ver);
+        handle->instance->getFWVersion(ver);
         *version = ver;
     }
     catch (...) {
@@ -460,7 +494,7 @@ void MLFProtoLib_GetFWVersion(MLF_handler handle, int* version) {
 void MLFProtoLib_GetLedsCount(MLF_handler handle, int* top, int* bottom) {
     try {
         int t, b;
-        MLF_PROTO_OBJ(handle)->getLedsCount(t, b);
+        handle->instance->getLedsCount(t, b);
         *top = t;
         *bottom = b;
     }
@@ -471,40 +505,56 @@ void MLFProtoLib_GetLedsCount(MLF_handler handle, int* top, int* bottom) {
 
 int MLFProtoLib_TurnOff(MLF_handler handle) {
     try {
-        MLF_PROTO_OBJ(handle)->turnOff();
+        handle->instance->turnOff();
         return 0;
     }
-    catch (...) {
+    catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
         return -1;
     }
 }
 
 int MLFProtoLib_SetBrightness(MLF_handler handle, int val) {
     try {
-        MLF_PROTO_OBJ(handle)->setBrightness(val);
+        handle->instance->setBrightness(val);
         return 0;
     }
-    catch (...) {
+    catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
         return -1;
     }
 }
 
 int MLFProtoLib_SetColors(MLF_handler handle, int* colors, int len) {
     try {
-        MLF_PROTO_OBJ(handle)->setColors(colors, len);
+        handle->instance->setColors(colors, len);
         return 0;
     }
-    catch (...) {
+    catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
         return -1;
     }
 }
 
 int MLFProtoLib_SetEffect(MLF_handler handle, int effect, int speed, int strip, int color) {
     try {
-        MLF_PROTO_OBJ(handle)->setEffect(effect, speed, strip, color);
+        handle->instance->setEffect(effect, speed, strip, color);
         return 0;
     }
-    catch (...) {
+    catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
         return -1;
     }
+}
+
+const char* MLFProtoLib_GetError(MLF_handler handle) {
+    return handle->exceptionMessage;
 }

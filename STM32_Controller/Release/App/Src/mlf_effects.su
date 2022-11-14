@@ -1,7 +1,0 @@
-../App/Src/mlf_effects.c:22:14:hue2rgb	40	static
-../App/Src/mlf_effects.c:101:12:effect_bar_cycle	48	static
-../App/Src/mlf_effects.c:86:12:effect_static_color	24	static
-../App/Src/mlf_effects.c:31:21:hsl2rgb.constprop	56	static
-../App/Src/mlf_effects.c:50:12:effect_rainbow	32	static
-../App/Src/mlf_effects.c:70:12:effect_color_cycle	32	static
-../App/Src/mlf_effects.c:139:5:run_effect_frame	4	static

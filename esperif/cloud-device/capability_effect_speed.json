@@ -1,0 +1,37 @@
+{
+    "name": "Color Effects Speed",
+    "attributes": {
+        "speed": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "title": "Effect speed",
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 30,
+                        "default": 1
+                    }
+                },
+                "additionalProperties": false
+            },
+            "setter": "setSpeed"
+        }
+    },
+    "commands": {
+        "setSpeed": {
+            "name": "setSpeed",
+            "arguments": [
+                {
+                    "name": "speed",
+                    "optional": false,
+                    "schema": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 30
+                    }
+                }
+            ]
+        }
+    }
+}

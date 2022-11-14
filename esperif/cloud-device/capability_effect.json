@@ -1,0 +1,47 @@
+{
+    "name": "Color Effects",
+    "attributes": {
+        "name": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "title": "Effect name",
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "rainbow",
+                            "static",
+                            "fading",
+                            "progress"
+                        ],
+                        "default": "None"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "setter": "selectEffect"
+        }
+    },
+    "commands": {
+        "selectEffect": {
+            "name": "selectEffect",
+            "arguments": [
+                {
+                    "name": "name",
+                    "optional": false,
+                    "schema": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "rainbow",
+                            "static",
+                            "fading",
+                            "progress"
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+}

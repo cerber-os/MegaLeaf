@@ -1,0 +1,11 @@
+{
+    "tag": "pl",
+    "label": "Efekty świetlne",
+    "attributes": {
+      "speed": {
+        "label": "Szybkość",
+        "displayTemplate": "Szybkość efektu jest równa {{value}}",
+        "i18n": {}
+      }
+    }
+  }

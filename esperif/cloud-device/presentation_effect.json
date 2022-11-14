@@ -1,0 +1,186 @@
+{
+    "dashboard": {
+        "states": [
+            {
+                "label": "{{name.value}}",
+                "alternatives": [
+                    {
+                        "key": "none",
+                        "value": "{{i18n.attributes.name.i18n.value.none.label}}",
+                        "type": "inactive"
+                    },
+                    {
+                        "key": "rainbow",
+                        "value": "{{i18n.attributes.name.i18n.value.rainbow.label}}",
+                        "type": "active"
+                    },
+                    {
+                        "key": "static",
+                        "value": "{{i18n.attributes.name.i18n.value.static.label}}",
+                        "type": "active"
+                    },
+                    {
+                        "key": "fading",
+                        "value": "{{i18n.attributes.name.i18n.value.fading.label}}",
+                        "type": "active"
+                    },
+                    {
+                        "key": "progress",
+                        "value": "{{i18n.attributes.name.i18n.value.progress.label}}",
+                        "type": "active"
+                    }
+                ]
+            }
+        ],
+        "actions": [],
+        "basicPlus": []
+    },
+    "detailView": [
+        {
+            "label": "{{i18n.label}}",
+            "displayType": "list",
+            "list": {
+                "command": {
+                    "name": "selectEffect",
+                    "alternatives": [
+                        {
+                            "key": "none",
+                            "value": "{{i18n.attributes.name.i18n.value.none.label}}",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "rainbow",
+                            "value": "{{i18n.attributes.name.i18n.value.rainbow.label}}",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "static",
+                            "value": "{{i18n.attributes.name.i18n.value.static.label}}",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "fading",
+                            "value": "{{i18n.attributes.name.i18n.value.fading.label}}",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "progress",
+                            "value": "{{i18n.attributes.name.i18n.value.progress.label}}",
+                            "type": "inactive"
+                        }
+                    ],
+                    "argumentType": "string"
+                },
+                "state": {
+                    "value": "name.value",
+                    "valueType": "string",
+                    "alternatives": [
+                        {
+                            "key": "none",
+                            "value": "{{i18n.attributes.name.i18n.value.none.label}}",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "rainbow",
+                            "value": "{{i18n.attributes.name.i18n.value.rainbow.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "static",
+                            "value": "{{i18n.attributes.name.i18n.value.static.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "fading",
+                            "value": "{{i18n.attributes.name.i18n.value.fading.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "progress",
+                            "value": "{{i18n.attributes.name.i18n.value.progress.label}}",
+                            "type": "active"
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "automation": {
+        "conditions": [
+            {
+                "label": "{{i18n.label}}",
+                "displayType": "list",
+                "list": {
+                    "alternatives": [
+                        {
+                            "key": "none",
+                            "value": "{{i18n.attributes.name.i18n.value.none.label}}",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "rainbow",
+                            "value": "{{i18n.attributes.name.i18n.value.rainbow.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "static",
+                            "value": "{{i18n.attributes.name.i18n.value.static.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "fading",
+                            "value": "{{i18n.attributes.name.i18n.value.fading.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "progress",
+                            "value": "{{i18n.attributes.name.i18n.value.progress.label}}",
+                            "type": "active"
+                        }
+                    ],
+                    "value": "name.value",
+                    "valueType": "string"
+                }
+            }
+        ],
+        "actions": [
+            {
+                "label": "{{i18n.label}}",
+                "displayType": "list",
+                "list": {
+                    "alternatives": [
+                        {
+                            "key": "none",
+                            "value": "{{i18n.attributes.name.i18n.value.none.label}}",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "rainbow",
+                            "value": "{{i18n.attributes.name.i18n.value.rainbow.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "static",
+                            "value": "{{i18n.attributes.name.i18n.value.static.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "fading",
+                            "value": "{{i18n.attributes.name.i18n.value.fading.label}}",
+                            "type": "active"
+                        },
+                        {
+                            "key": "progress",
+                            "value": "{{i18n.attributes.name.i18n.value.progress.label}}",
+                            "type": "active"
+                        }
+                    ],
+                    "command": "selectEffect",
+                    "argumentType": "string"
+                }
+            }
+        ]
+    },
+    "id": "clevercoast26830.colorEffects",
+    "version": 1
+}

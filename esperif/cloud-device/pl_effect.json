@@ -1,0 +1,29 @@
+{
+    "tag": "pl",
+    "label": "Efekty świetlne",
+    "attributes": {
+      "name": {
+        "label": "Nazwa",
+        "displayTemplate": "Efekt {{value}}",
+        "i18n": {
+          "value": {
+            "none": {
+              "label": "Brak"
+            },
+            "rainbow": {
+              "label": "Rainbow"
+            },
+            "static": {
+              "label": "Static"
+            },
+            "fading": {
+              "label": "Fading"
+            },
+            "progress": {
+              "label": "Progress Bar"
+            }
+          }
+        }
+      }
+    }
+  }

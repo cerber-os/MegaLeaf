@@ -1,0 +1,43 @@
+{
+    "dashboard": {
+        "states": [],
+        "actions": [],
+        "basicPlus": []
+    },
+    "detailView": [
+        {
+            "label": "{{i18n.attributes.speed.label}}",
+            "displayType": "slider",
+            "slider": {
+                "value": "speed.value",
+                "command": "setSpeed",
+                "range": [
+                    0,
+                    30
+                ],
+                "step": 1,
+                "argumentType": "integer"
+            }
+        }
+    ],
+    "automation": {
+        "actions": [
+            {
+                "label": "{{i18n.attributes.speed.label}}",
+                "displayType": "slider",
+                "slider": {
+                    "value": "speed.value",
+                    "command": "setSpeed",
+                    "range": [
+                        0,
+                        30
+                    ],
+                    "step": 1,
+                    "argumentType": "integer"
+                }
+            }
+        ]
+    },
+    "id": "clevercoast26830.colorEffectsSpeed",
+    "version": 1
+}

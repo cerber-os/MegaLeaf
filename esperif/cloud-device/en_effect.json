@@ -1,0 +1,29 @@
+{
+    "tag": "en",
+    "label": "Visual effects",
+    "attributes": {
+      "name": {
+        "label": "Name",
+        "displayTemplate": "Effect for {{device.label}} is {{value}}",
+        "i18n": {
+          "value": {
+            "none": {
+              "label": "None"
+            },
+            "rainbow": {
+              "label": "Rainbow"
+            },
+            "static": {
+              "label": "Static"
+            },
+            "fading": {
+              "label": "Fading"
+            },
+            "progress": {
+              "label": "Progress Bar"
+            }
+          }
+        }
+      }
+    }
+  }

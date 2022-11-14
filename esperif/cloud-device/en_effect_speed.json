@@ -1,0 +1,11 @@
+{
+    "tag": "en",
+    "label": "Visual effects",
+    "attributes": {
+      "speed": {
+        "label": "Speed",
+        "displayTemplate": "Effects' speed for {{device.label}} is {{value}}",
+        "i18n": {}
+      }
+    }
+  }

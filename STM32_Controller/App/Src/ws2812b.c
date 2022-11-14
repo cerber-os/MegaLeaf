@@ -9,6 +9,7 @@
 #include "ws2812.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,7 +23,6 @@
 #define SPI_MAX_DELAY			-1
 #define SPI_RES_SIGNAL_LEN		125
 
-#define SPI_
 #define SPI_BUF_LEN(LEDS)		((LEDS * SPI_BYTES_PER_DIODE) + SPI_RES_SIGNAL_LEN)
 
 
@@ -72,6 +72,7 @@ int init_led_strip(struct LEDStrip** stripp, SPI_HandleTypeDef* hspi, uint32_t l
 	strip->spi = hspi;
 	strip->len = len;
 	strip->brightness = 255;
+	strip->apply_ratio = 0;
 	strip->_data_buffer = malloc(SPI_BUF_LEN(len));
 	if(strip->_data_buffer == NULL)
 		return -1;
@@ -89,12 +90,29 @@ void set_led_color(struct LEDStrip* strip, int idx, struct Color color) {
 	uint32_t data;
 	uint32_t offset = idx * SPI_BYTES_PER_DIODE;
 
-	assert(idx < strip->len);
+	if(idx >= strip->len) {
+		printk(LOG_ERR "WS2812B: set_led_color invoked with invalid idx (%d) "
+				"; strip len (%d)", idx, strip->len);
+		return;
+	}
 
 	// Apply brightness to selected color
-	color.r = (uint8_t)(color.r * (float)strip->brightness / 255.0);
-	color.g = (uint8_t)(color.g * (float)strip->brightness / 255.0);
-	color.b = (uint8_t)(color.b * (float)strip->brightness / 255.0);
+	color.r = ((uint16_t) color.r * strip->brightness) / 255;
+	color.g = ((uint16_t) color.g * strip->brightness) / 255;
+	color.b = ((uint16_t) color.b * strip->brightness) / 255;
+
+	// Apply color calibration data
+	if(strip->apply_ratio) {
+		if(idx < strip->ratio_index) {
+			color.r = ((uint32_t) color.r * strip->rt1_r.num) / strip->rt1_r.denum;
+			color.g = ((uint32_t) color.g * strip->rt1_g.num) / strip->rt1_g.denum;
+			color.b = ((uint32_t) color.b * strip->rt1_b.num) / strip->rt1_b.denum;
+		} else {
+			color.r = ((uint32_t) color.r * strip->rt2_r.num) / strip->rt2_r.denum;
+			color.g = ((uint32_t) color.g * strip->rt2_g.num) / strip->rt2_g.denum;
+			color.b = ((uint32_t) color.b * strip->rt2_b.num) / strip->rt2_b.denum;
+		}
+	}
 
 	data = encode_byte(color.g);
 	memcpy(&strip->_data_buffer[offset], &data, 3);
@@ -107,12 +125,12 @@ void set_led_color(struct LEDStrip* strip, int idx, struct Color color) {
 void refresh_leds(struct LEDStrip* strip) {
 	int ret;
 
-	__disable_irq();
-	ret = HAL_SPI_Transmit(strip->spi, strip->_data_buffer, SPI_BUF_LEN(strip->len), SPI_MAX_DELAY);
-	__enable_irq();
+	// Await for DMA to be ready
+	while(HAL_SPI_GetState(strip->spi) != HAL_SPI_STATE_READY) {}
 
+	ret = HAL_SPI_Transmit_DMA(strip->spi, strip->_data_buffer, SPI_BUF_LEN(strip->len));
 	if(ret != HAL_OK) {
-		printf("|%s| HAL_SPI_Transmit returned with an error - %d\n", __func__, ret);
+		printk(LOG_ERR "WS2812B: HAL_SPI transmit returned with an error - %d\n", ret);
 	}
 }
 
@@ -122,6 +140,21 @@ void clear_leds(struct LEDStrip* strip) {
 
 void set_leds_brightness(struct LEDStrip* strip, uint8_t brightness) {
 	strip->brightness = brightness;
+}
+
+void calibrate_leds_colors(struct LEDStrip* strip, struct Ratio r, struct Ratio g, struct Ratio b, uint16_t idx) {
+	if(idx == 0) {
+		strip->rt1_r = r;
+		strip->rt1_g = g;
+		strip->rt1_b = b;
+		strip->ratio_index = -1;
+	} else {
+		strip->rt2_r = r;
+		strip->rt2_g = g;
+		strip->rt2_b = b;
+		strip->ratio_index = idx;
+	}
+	strip->apply_ratio = 1;
 }
 
 struct Color int2Color(int color) {

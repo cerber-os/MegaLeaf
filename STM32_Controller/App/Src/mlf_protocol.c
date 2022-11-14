@@ -5,28 +5,39 @@
  */
 
 #include "mlf_protocol.h"
+#include "logger.h"
 
-#include "stm32l5xx_hal.h"
-#include "usbd_cdc_if.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static void MLF_resp_error(enum MLF_error_codes error);
-static int MLF_validate_header(uint8_t* buf);
-static int MLF_validate_footer(uint8_t* buf);
-static void MLF_submit_packet(uint8_t* buf, uint32_t len);
+static void MLF_resp_error(struct MLF_ctx* ctx, enum MLF_error_codes error);
+static int MLF_validate_header(struct MLF_ctx* ctx, uint8_t* buf);
+static int MLF_validate_footer(struct MLF_ctx* ctx, uint8_t* buf);
+static void MLF_submit_packet(struct MLF_ctx* ctx, uint8_t* buf, uint32_t len);
+
+/**********************
+ * COMPATIBILITY LAYER
+ **********************/
+#ifdef USE_HAL_DRIVER
+#include "stm32f4xx_hal.h"
+#else
+
+#endif
 
 /**********************
  * LOGGING SUPPORT
  **********************/
-#define LOG_INFO(MSG, ...)		printf("[INFO] |%s| " MSG "\n", __func__, ##__VA_ARGS__);
+#ifdef USE_HAL_DRIVER
+#define LOG_WARN(MSG, ...)		printk(LOG_WARNING "mlf_protocol: |%s| " MSG, __func__, ##__VA_ARGS__);
+#define LOG_ERROR(MSG, ...)		printk(LOG_ERR "mlf_protocol: |%s| " MSG, __func__, ##__VA_ARGS__);
+#else
 #define LOG_WARN(MSG, ...)		printf("[WARN] |%s| " MSG "\n", __func__, ##__VA_ARGS__);
 #define LOG_ERROR(MSG, ...)		printf("[ERROR]|%s| " MSG "\n", __func__, ##__VA_ARGS__);
-
+#endif
 /**********************
  * PACKET BUFFER SUPPORT
- *  - for processing data received via USB CDC, we need
+ *  - for processing data received from client, we need
  *    simple buffer to which data can be appended and which
  *    will drop partial transfers
  **********************/
@@ -36,6 +47,8 @@ static void MLF_submit_packet(uint8_t* buf, uint32_t len);
 										sizeof(struct MLF_packet_footer))
 
 struct packet_buffer {
+	struct MLF_ctx* ctx;
+
 	uint8_t  header_validated;
 	uint32_t time_last_packet;
 	uint32_t size;
@@ -50,7 +63,7 @@ static void packet_buffer_clear(struct packet_buffer* pkt) {
 	memset(pkt->buffer, 0, sizeof pkt->buffer);
 }
 
-struct packet_buffer* packet_buffer_init(void) {
+struct packet_buffer* packet_buffer_init(struct MLF_ctx* ctx) {
 	struct packet_buffer* pkt;
 
 	pkt = malloc(sizeof *pkt);
@@ -59,6 +72,7 @@ struct packet_buffer* packet_buffer_init(void) {
 		return NULL;
 	}
 
+	pkt->ctx = ctx;
 	packet_buffer_clear(pkt);
 	return pkt;
 }
@@ -86,7 +100,7 @@ int packet_buffer_append(struct packet_buffer* pkt, uint8_t* buf, uint32_t len) 
 	if(pkt->size + len >= PACKET_BUFFER_MAX_SIZE) {
 		LOG_ERROR("Packet buffer overflow");
 		packet_buffer_clear(pkt);
-		MLF_resp_error(MLF_RET_DATA_TOO_LARGE);
+		MLF_resp_error(pkt->ctx, MLF_RET_DATA_TOO_LARGE);
 		return -1;
 	}
 
@@ -96,7 +110,7 @@ int packet_buffer_append(struct packet_buffer* pkt, uint8_t* buf, uint32_t len) 
 
 	// Validate header and footer of received data
 	if(!pkt->header_validated && pkt->size >= sizeof(struct MLF_req_packet_header)) {
-		ret = MLF_validate_header(pkt->buffer);
+		ret = MLF_validate_header(pkt->ctx, pkt->buffer);
 		if(ret) {
 			// MLF_validate_header already reports an error to host
 			packet_buffer_clear(pkt);
@@ -108,7 +122,7 @@ int packet_buffer_append(struct packet_buffer* pkt, uint8_t* buf, uint32_t len) 
 	footer_offset = sizeof(struct MLF_req_packet_header) +
 					((struct MLF_req_packet_header*)pkt->buffer)->data_size;
 	if(pkt->size >= footer_offset + sizeof(struct MLF_packet_footer)) {
-		ret = MLF_validate_footer(pkt->buffer);
+		ret = MLF_validate_footer(pkt->ctx, pkt->buffer);
 		if(ret) {
 			// MLF_validate_footer already reports an error to host
 			packet_buffer_clear(pkt);
@@ -116,7 +130,7 @@ int packet_buffer_append(struct packet_buffer* pkt, uint8_t* buf, uint32_t len) 
 		}
 
 		// Full packet has been received
-		MLF_submit_packet(pkt->buffer, pkt->size);
+		MLF_submit_packet(pkt->ctx, pkt->buffer, pkt->size);
 		packet_buffer_clear(pkt);
 		return 0;
 	}
@@ -129,26 +143,33 @@ int packet_buffer_append(struct packet_buffer* pkt, uint8_t* buf, uint32_t len) 
 /**********************
  * MegaLeaf (MLF) Packet Support
  **********************/
-#define MAX_RESPONSE_DELAY		30
-static MLF_command_handler MLF_operations[MLF_CMD_MAX] = {0};
+#define MAX_RESPONSE_DELAY					6
+struct MLF_reroute g_reroute;
 
-uint8_t recv_packet_len;
-uint8_t* recv_packet_buf;
-volatile uint8_t new_data_available = 0;
+// Allow for at most 5 commands rerouted every 3 seconds
+#define REROUTE_RATELIMIT_BURST_SIZE		5
+#define REROUTE_RATELIMIT_BURST_LEN			3
+uint32_t reroute_start_time;
+uint8_t reroute_count;
 
-int MLF_init(void) {
-	recv_packet_buf = malloc(PACKET_BUFFER_MAX_SIZE);
-	if(recv_packet_buf == NULL)
+int MLF_init(struct MLF_ctx* ctx, MLF_write_func write_func) {
+	memset(ctx, 0, sizeof(*ctx));
+
+	ctx->recv_packet_buf = malloc(PACKET_BUFFER_MAX_SIZE);
+	if(ctx->recv_packet_buf == NULL) {
+		printk(LOG_EMERG "mlf_protocol: failed to allocate memory for recv_packet_buf");
 		return -1;
+	}
+	memset(ctx->recv_packet_buf, 0, PACKET_BUFFER_MAX_SIZE);
+	ctx->write_func = write_func;
 
-	memset(recv_packet_buf, 0, PACKET_BUFFER_MAX_SIZE);
 	return 0;
 }
 
-static void MLF_resp_error(enum MLF_error_codes error) {
+static void MLF_resp_error(struct MLF_ctx* ctx, enum MLF_error_codes error) {
 	int ret = 0;
 	struct MLF_resp_packet_header header = {
-			.magic = MLF_HEADER_MAGIC,
+			.magic = MLF_RESP_HEADER_MAGIC,
 			.error_code = error,
 			.data_size = 0
 	};
@@ -160,9 +181,9 @@ static void MLF_resp_error(enum MLF_error_codes error) {
 	memcpy(output_buffer, &header, sizeof(header));
 	memcpy(output_buffer + sizeof header, &footer, sizeof(footer));
 
-	ret = CDC_Transmit_FS(output_buffer, sizeof output_buffer);
+	ret = ctx->write_func(output_buffer, sizeof output_buffer);
 	if(ret)
-		LOG_ERROR("Failed to send error reponse - CDC_Transmit_FS returned %d", ret);
+		LOG_ERROR("failed to send error response - write_func returned %d", ret);
 		// We might be in interrupt context here, so there's literally nth we could do about
 		//  this error. Normally, if it's USB_BUSY error, we would sleep a while, but
 		//  here, it's better to just give up
@@ -170,13 +191,16 @@ static void MLF_resp_error(enum MLF_error_codes error) {
 }
 
 #define MAX_OUTPUT_SIZE (sizeof(struct MLF_resp_packet_header) + sizeof(struct MLF_packet_footer) + 1024)
+static uint8_t output_buffer_global[MAX_OUTPUT_SIZE];
 
-static uint8_t output_buffer[MAX_OUTPUT_SIZE];
-static void MLF_resp_data(enum MLF_error_codes error, uint8_t* buf, uint16_t len) {
+static void MLF_resp_data(struct MLF_ctx* ctx, enum MLF_error_codes error, uint8_t* buf, uint16_t len) {
 	int ret = 0;
 	int delay = MAX_RESPONSE_DELAY;
+	uint8_t output_buffer_stack[128];
+	uint8_t* output_buffer;
+
 	struct MLF_resp_packet_header header = {
-			.magic = MLF_HEADER_MAGIC,
+			.magic = MLF_RESP_HEADER_MAGIC,
 			.error_code = error,
 			.data_size = len
 	};
@@ -185,22 +209,24 @@ static void MLF_resp_data(enum MLF_error_codes error, uint8_t* buf, uint16_t len
 	};
 
 	const uint32_t output_buffer_size = sizeof header + sizeof footer + len;
-
-	if(output_buffer_size > MAX_OUTPUT_SIZE) {
-		LOG_ERROR("Failed to send response - static buffer is not large enough");
+	if(output_buffer_size <= sizeof(output_buffer_stack))
+		output_buffer = output_buffer_stack;
+	else if(output_buffer_size > MAX_OUTPUT_SIZE) {
+		LOG_ERROR("failed to send response - static buffer is not large enough");
 		return ;
-	}
+	} else
+		output_buffer = output_buffer_global;
 
 	memcpy(output_buffer, &header, sizeof header);
 	memcpy(output_buffer + sizeof header, buf, len);
 	memcpy(output_buffer + sizeof header + len, &footer, sizeof footer);
 
 	while(delay--) {
-		ret = CDC_Transmit_FS(output_buffer, output_buffer_size);
-		if(ret == USBD_OK)
+		ret = ctx->write_func(output_buffer, output_buffer_size);
+		if(ret == HAL_OK)
 			break;
-		else if(ret != USBD_BUSY) {
-			LOG_ERROR("Failed to send response - CDC_Transmit_FS returned %d", ret);
+		else if(ret != HAL_BUSY) {
+			LOG_ERROR("Failed to send response - write_func returned %d", ret);
 			return;
 		}
 
@@ -208,35 +234,40 @@ static void MLF_resp_data(enum MLF_error_codes error, uint8_t* buf, uint16_t len
 		HAL_Delay(10);
 	}
 
-	if(ret == USBD_BUSY)
-		LOG_ERROR("Failed to send response - CSC_Transmit_FS is BUSY");
+	if(ret == HAL_BUSY)
+		LOG_ERROR("Failed to send response - write_func is BUSY");
 
-	// LOG_INFO("Sent response packet do host");
 }
 
-static int MLF_validate_header(uint8_t* buf) {
+static int MLF_validate_header(struct MLF_ctx* ctx, uint8_t* buf) {
 	struct MLF_req_packet_header* pkt = (struct MLF_req_packet_header*) buf;
 
-	if(pkt->magic != MLF_HEADER_MAGIC) {
+	if(pkt->magic == MLF_HEADER_MAGIC) {
+		// Check fields specific to request header
+		if(pkt->cmd >= MLF_CMD_MAX) {
+			LOG_ERROR("Header with invalid command was received");
+			MLF_resp_error(ctx, MLF_RET_INVALID_CMD);
+			return 1;
+		}
+	} else if(pkt->magic == MLF_RESP_HEADER_MAGIC) {
+		// There's n-th to extra validate in response packets
+		;
+	} else {
 		LOG_ERROR("Header with invalid magic was received");
-		MLF_resp_error(MLF_RET_INVALID_HEADER);
+		MLF_resp_error(ctx, MLF_RET_INVALID_HEADER);
 		return 1;
 	}
-	if(pkt->cmd >= MLF_CMD_MAX) {
-		LOG_ERROR("Header with invalid command was received");
-		MLF_resp_error(MLF_RET_INVALID_CMD);
-		return 1;
-	}
+
 	if(pkt->data_size > MLF_MAX_DATA_SIZE){
 		LOG_ERROR("Header with too large data size was received");
-		MLF_resp_error(MLF_RET_DATA_TOO_LARGE);
+		MLF_resp_error(ctx, MLF_RET_DATA_TOO_LARGE);
 		return 1;
 	}
 
 	return 0;
 }
 
-static int MLF_validate_footer(uint8_t* buf) {
+static int MLF_validate_footer(struct MLF_ctx* ctx, uint8_t* buf) {
 	struct MLF_req_packet_header* pkt = (struct MLF_req_packet_header*) buf;
 	struct MLF_packet_footer* footer;
 
@@ -245,53 +276,155 @@ static int MLF_validate_footer(uint8_t* buf) {
 	if(footer->magic != MLF_FOOTER_MAGIC) {
 		LOG_ERROR("Footer with invalid magic was received - received [%lx]; expected [%lx]",
 					footer->magic, MLF_FOOTER_MAGIC);
-		MLF_resp_error(MLF_RET_INVALID_FOOTER);
+		MLF_resp_error(ctx, MLF_RET_INVALID_FOOTER);
 		return 1;
 	}
 
 	return 0;
 }
 
-static void MLF_submit_packet(uint8_t* buf, uint32_t len) {
+static void MLF_submit_packet(struct MLF_ctx* ctx, uint8_t* buf, uint32_t len) {
 
-	if(!recv_packet_buf)
-		return;
 	if(len > PACKET_BUFFER_MAX_SIZE)
 		len = PACKET_BUFFER_MAX_SIZE;
-	if(new_data_available) {
+	if(ctx->new_data_available) {
 		LOG_ERROR("Dropping packet - previous hasn't been processed yet");
 		return;
 	}
 
-	memcpy(recv_packet_buf, buf, len);
-	new_data_available = 1;
+	memcpy(ctx->recv_packet_buf, buf, len);
+	ctx->new_data_available = 1;
 }
 
-int MLF_is_packet_available(void) {
-	return new_data_available;
+int MLF_is_packet_available(struct MLF_ctx* ctx) {
+	return ctx->new_data_available;
 }
 
-void MLF_process_packet(void) {
+static void MLF_reroute(struct MLF_ctx* current, enum MLF_commands cmd, uint8_t* data, uint16_t size) {
+	if(g_reroute.from != current)
+		return;
+	if(!(g_reroute.routed_cmds & (1UL << cmd)))
+		return;
+
+	uint32_t current_time = HAL_GetTick();
+	if(current_time - reroute_start_time >= REROUTE_RATELIMIT_BURST_LEN * 1000) {
+		reroute_start_time = current_time;
+		reroute_count = 0;
+	}
+
+	if(reroute_count > REROUTE_RATELIMIT_BURST_SIZE) {
+		printk(LOG_WARNING, "mlf-protocol: rate-limiting rerouted messages");
+		return;
+	}
+	reroute_count++;
+
+	MLF_SendCmd(g_reroute.to, cmd, data, size);
+}
+
+void MLF_process_packet(struct MLF_ctx* ctx) {
 	int ret = MLF_RET_NOT_READY;
 	uint8_t response[64];
 	uint16_t response_size = 0;
 	struct MLF_req_packet_header* hdr;
 
-	if(!new_data_available)
+	if(!ctx->new_data_available)
 		return;
 
-	hdr = (struct MLF_req_packet_header*) recv_packet_buf;
+	hdr = (struct MLF_req_packet_header*) ctx->recv_packet_buf;
 
-	if(MLF_operations[hdr->cmd] != NULL)
-		ret = MLF_operations[hdr->cmd](hdr->data, hdr->data_size, response, &response_size);
+	if(hdr->magic == MLF_RESP_HEADER_MAGIC) {
+		// Handle response packet
+		if(ctx->ops[MLF_CMD_HANDLE_RESPONSE] != NULL) {
+			ret = ctx->ops[MLF_CMD_HANDLE_RESPONSE](hdr->data, hdr->data_size, NULL, NULL);
+			if(ret != MLF_RET_OK)
+				LOG_WARN("Encountered an error while processing response (%d)", ret);
+		}
+
+		ctx->new_data_available = 0;
+		return;
+	}
+
+	if(ctx->ops[hdr->cmd] != NULL)
+		ret = ctx->ops[hdr->cmd](hdr->data, hdr->data_size, response, &response_size);
 	if(ret != MLF_RET_OK)
-		LOG_WARN("Command processing finished with code %d", ret);
+		LOG_WARN("Command processing finished with code %d", ret)
+	else
+		MLF_reroute(ctx, hdr->cmd, hdr->data, hdr->data_size);
 
 	hdr = NULL;
-	new_data_available = 0;
-	MLF_resp_data(ret, response, response_size);
+	ctx->new_data_available = 0;
+	MLF_resp_data(ctx, ret, response, response_size);
 }
 
-void MLF_register_callback(enum MLF_commands cmd, MLF_command_handler cb) {
-	MLF_operations[cmd] = cb;
+void MLF_register_callback(struct MLF_ctx* ctx, enum MLF_commands cmd, MLF_command_handler cb) {
+	ctx->ops[cmd] = cb;
+}
+
+void MLF_register_reroute(struct MLF_ctx* from, struct MLF_ctx* to, enum MLF_commands cmd) {
+	if(g_reroute.from && g_reroute.from != from) {
+		printk(LOG_ERR "mlf-protocol: Failed to register reroute - from is already set(%p), requested %p",
+				g_reroute.from, from);
+		return;
+	}
+
+	if(g_reroute.to && g_reroute.to != to) {
+		printk(LOG_ERR "mlf-protocol: Failed to register reroute - to is already set(%p), requested %p",
+				g_reroute.to, to);
+		return;
+	}
+
+	if(cmd == MLF_CMD_HANDLE_RESPONSE) {
+		printk(LOG_ERR, "mlf-protocol: Cannot reroute response command to another context (%d)", cmd);
+		return;
+	}
+
+	g_reroute.from = from;
+	g_reroute.to = to;
+	g_reroute.routed_cmds |= 1UL << cmd;
+	printk(LOG_INFO "mlf-protocol: Configured new cmd rerouting: (%d) %p -> %p", cmd, from, to);
+}
+
+void MLF_SendCmd(struct MLF_ctx* ctx, enum MLF_commands cmd, uint8_t* data, uint16_t size) {
+	int ret = 0;
+	int delay = MAX_RESPONSE_DELAY;
+	uint8_t output_buffer_stack[128];
+	uint8_t* output_buffer;
+
+	struct MLF_req_packet_header header = {
+			.magic = MLF_HEADER_MAGIC,
+			.cmd = cmd,
+			.data_size = size
+	};
+	struct MLF_packet_footer footer = {
+			.magic = MLF_FOOTER_MAGIC
+	};
+
+	const uint32_t output_buffer_size = sizeof header + sizeof footer + size;
+	if(output_buffer_size <= sizeof(output_buffer_stack))
+		output_buffer = output_buffer_stack;
+	else if(output_buffer_size > MAX_OUTPUT_SIZE) {
+		LOG_ERROR("Failed to send command - static buffer is not large enough");
+		return ;
+	} else
+		output_buffer = output_buffer_global;
+
+	memcpy(output_buffer, &header, sizeof header);
+	memcpy(output_buffer + sizeof header, data, size);
+	memcpy(output_buffer + sizeof header + size, &footer, sizeof footer);
+
+	while(delay--) {
+		ret = ctx->write_func(output_buffer, output_buffer_size);
+		if(ret == HAL_OK)
+			break;
+		else if(ret != HAL_BUSY) {
+			LOG_ERROR("Failed to send command - write_func returned %d", ret);
+			return;
+		}
+
+		// Give it another try
+		HAL_Delay(10);
+	}
+
+	if(ret == HAL_BUSY)
+		LOG_ERROR("Failed to send command - write_func is BUSY");
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * mlf_protocol.h - 
+ * mlf_protocol.h - definition of protocol to communicate with PC and ESP32
  *  (C) 2021 Pawel Wieczorek
  */
 #ifndef INC_MLF_PROTOCOL_H_
@@ -19,21 +19,29 @@
  * MLF PROTOCOL DEFINITION
  **********************/
 #define MLF_HEADER_MAGIC			0x004D4C46UL
+#define MLF_RESP_HEADER_MAGIC		0x00524C4DUL
 #define MLF_FOOTER_MAGIC			0x7364656CUL
 #define MLF_MAX_DATA_SIZE			2048
 
 enum MLF_commands {
 	MLF_CMD_TURN_OFF		= 0,
+	MLF_CMD_TURN_ON,
 	MLF_CMD_GET_INFO,
-
-	MLF_CMD_FEATURE_PING,
-	MLF_CMD_FEATURE_PING_CONFIG,
 
 	MLF_CMD_SET_BRIGHTNESS,
 	MLF_CMD_SET_COLOR,
 	MLF_CMD_SET_EFFECT,
 
-	MLF_CMD_MAX
+	MLF_CMD_GET_BRIGHTNESS,
+	MLF_CMD_GET_EFFECT,
+	MLF_CMD_GET_ON_STATE,
+
+	MLF_CMD_MAX,
+
+	// Nasty, but response is a special type of command with
+	//  different magic, format, etc. That's why it's put after
+	//  MLF_CMD_MAX enumerator
+	MLF_CMD_HANDLE_RESPONSE
 };
 
 enum MLF_error_codes {
@@ -114,13 +122,43 @@ struct MLF_req_cmd_set_effect {
 	uint32_t color;
 } PACKED;
 
+/*
+ * MLF_CMD_GET_BRIGHTNESS
+ */
+#define MLF_RESP_CMD_GET_BRIGHTNESS_LEN	(sizeof struct MLF_resp_cmd_get_brightness)
+
+struct MLF_resp_cmd_get_brightness {
+	uint8_t brightness;
+};
+
+/*
+ * MLF_CMD_GET_EFFECT
+ */
+#define MLF_RESP_CMD_GET_EFFECT_LEN		(sizeof struct MLF_resp_cmd_get_effect)
+
+struct MLF_resp_cmd_get_effect {
+	uint8_t effect;
+	uint8_t speed;
+	uint32_t color;
+};
+
+/*
+ * MLF_CMD_GET_ON_STATE
+ */
+#define MLF_RESP_CMD_GET_ON_STATE_LEN	(sizeof struct MLF_resp_cmd_get_on_state)
+
+struct MLF_resp_cmd_get_on_state {
+	uint8_t is_on;
+};
+
 
 /**********************
- * PACKET BUFFER FOR USB CDC DRIVER
+ * PACKET BUFFER FOR INCOMMING TRANSMISSION
  **********************/
+struct MLF_ctx;
 struct packet_buffer;
 
-struct packet_buffer* packet_buffer_init(void);
+struct packet_buffer* packet_buffer_init(struct MLF_ctx* ctx);
 void packet_buffer_deinit(struct packet_buffer*);
 int packet_buffer_append(struct packet_buffer*, uint8_t*, uint32_t);
 
@@ -129,11 +167,34 @@ int packet_buffer_append(struct packet_buffer*, uint8_t*, uint32_t);
  * PACKETS PROCESSING
  **********************/
 typedef int (*MLF_command_handler)(uint8_t*, uint16_t, uint8_t*, uint16_t*);
+typedef int (*MLF_write_func)(uint8_t*, uint16_t);
 
-int MLF_init(void);
-int MLF_is_packet_available(void);
-void MLF_process_packet(void);
-void MLF_register_callback(enum MLF_commands cmd, MLF_command_handler cb);
+enum MLF_OPTS {
+	MLF_OPTS_NONE				= 0,
+	MLF_OPTS_SEND_STATE_CHANGE	= 1 << 0,
+};
+
+struct MLF_ctx {
+	MLF_write_func write_func;
+	MLF_command_handler ops[MLF_CMD_HANDLE_RESPONSE + 1];
+	uint16_t recv_packet_len;
+	uint8_t* recv_packet_buf;
+	uint8_t new_data_available;
+	uint8_t opts;
+};
+
+struct MLF_reroute {
+	struct MLF_ctx* from;
+	struct MLF_ctx* to;
+	uint32_t routed_cmds;
+};
+
+int MLF_init(struct MLF_ctx*, MLF_write_func);
+int MLF_is_packet_available(struct MLF_ctx* ctx);
+void MLF_process_packet(struct MLF_ctx* ctx);
+void MLF_register_callback(struct MLF_ctx* ctx, enum MLF_commands cmd, MLF_command_handler cb);
+void MLF_register_reroute(struct MLF_ctx* from, struct MLF_ctx* to, enum MLF_commands cmd);
+void MLF_SendCmd(struct MLF_ctx* ctx, enum MLF_commands cmd, uint8_t* data, uint16_t size);
 
 #ifdef _MSC_VER
 	__pragma(pack(pop))

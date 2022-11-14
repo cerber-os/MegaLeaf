@@ -1,0 +1,11 @@
+../App/Src/mlf_protocol.c:59:13:packet_buffer_clear	0	static
+../App/Src/mlf_protocol.c:169:13:MLF_resp_error.isra	24	static
+../App/Src/mlf_protocol.c:66:23:packet_buffer_init	16	static
+../App/Src/mlf_protocol.c:80:6:packet_buffer_deinit	0	static
+../App/Src/mlf_protocol.c:88:5:packet_buffer_append	24	static
+../App/Src/mlf_protocol.c:155:5:MLF_init	16	static
+../App/Src/mlf_protocol.c:299:5:MLF_is_packet_available	0	static
+../App/Src/mlf_protocol.c:359:6:MLF_register_callback	0	static
+../App/Src/mlf_protocol.c:363:6:MLF_register_reroute	8	static
+../App/Src/mlf_protocol.c:387:6:MLF_SendCmd	152	static
+../App/Src/mlf_protocol.c:324:6:MLF_process_packet	232	static

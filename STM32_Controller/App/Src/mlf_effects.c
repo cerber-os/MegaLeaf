@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * mlf_effects.c - 
+ * mlf_effects.c - implementation of awesome effect that can be displayed on panel
  *  (C) 2021 Pawel Wieczorek
  */
 
@@ -64,7 +64,7 @@ static int effect_rainbow(struct LEDStrip* strip, uint32_t frame, uint32_t data)
 		set_led_color(strip, i, hsl2rgb(partialHue, 1, 0.5));
 	}
 
-	return 1;
+	return MLF_EFFECT_REFRESH_REQ;
 }
 
 static int effect_color_cycle(struct LEDStrip* strip, uint32_t frame, uint32_t data) {
@@ -80,7 +80,7 @@ static int effect_color_cycle(struct LEDStrip* strip, uint32_t frame, uint32_t d
 	for(i = 0; i < leds_count; i++)
 		set_led_color(strip, i, color);
 
-	return 1;
+	return MLF_EFFECT_REFRESH_REQ;
 }
 
 static int effect_static_color(struct LEDStrip* strip, uint32_t frame, uint32_t data) {
@@ -98,6 +98,33 @@ static int effect_static_color(struct LEDStrip* strip, uint32_t frame, uint32_t 
 	return 0;
 }
 
+static int effect_bar_cycle(struct LEDStrip* strip, uint32_t frame, uint32_t data) {
+	int i, width, pos;
+	const int leds_count = get_leds_count(strip);
+	struct Color color, target;
+
+	color.r = data & 0xff;
+	color.g = (data >> 8) & 0xff;
+	color.b = (data >> 16) & 0xff;
+
+	pos = frame % 100;
+	pos /= leds_count;
+	width = leds_count / 5;
+
+	for(i = 0; i < pos; i++)
+		set_led_color(strip, i, (struct Color) {0, 0, 0});
+	for(i = pos; i < pos + width; i++) {
+		target.r = color.r;
+		target.g = color.g;
+		target.b = color.b;
+		set_led_color(strip, i % leds_count, target);
+	}
+	for(i = pos + width; i < leds_count; i++)
+		set_led_color(strip, i, (struct Color) {0, 0, 0});
+
+	return MLF_EFFECT_REFRESH_REQ;
+}
+
 /***************************
  * HANDLERS FOR SUPPORTED EFFECTS
  ***************************/
@@ -105,14 +132,15 @@ static MLF_effects_handlers effect_handlers[EFFECT_MAX] = {
 		[EFFECT_RAINBOW] = 		effect_rainbow,
 		[EFFECT_COLOR_CYCLE] = 	effect_color_cycle,
 		[EFFECT_STATIC_COLOR] = effect_static_color,
+		[EFFECT_BAR_CYCLE] = effect_bar_cycle,
 };
 
 
 int run_effect_frame(struct LEDStrip* strip, enum MLF_EFFECTS effect, uint32_t frame, uint32_t data) {
 	if(effect < 0 || effect >= EFFECT_MAX)
-		return 0;
+		return -1;
 	if(effect_handlers[effect] == NULL)
-		return 0;
+		return -1;
 
 	return effect_handlers[effect](strip, frame, data);
 }

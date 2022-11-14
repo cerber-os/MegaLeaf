@@ -1,0 +1,3 @@
+../Core/Src/boot_setup.c:36:6:boot_save_reset_reason	0	static
+../Core/Src/boot_setup.c:41:5:boot_get_reset_reason_id	0	static
+../Core/Src/boot_setup.c:45:13:boot_get_reset_reason_str	8	static

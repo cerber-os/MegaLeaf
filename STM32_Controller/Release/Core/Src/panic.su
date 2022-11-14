@@ -1,0 +1,5 @@
+../Core/Src/panic.c:57:39:system_reset	8	static
+../Core/Src/panic.c:67:12:NMI_IRQHandler	8	static
+../Core/Src/panic.c:42:13:panic_header	16	static
+../Core/Src/panic.c:98:6:handle_exception	112	static
+../Core/Src/panic.c:132:32:panic	8	static

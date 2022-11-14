@@ -1,0 +1,17 @@
+../App/Src/app.c:65:5:app_turn_on	0	static
+../App/Src/app.c:70:5:app_turn_off	0	static
+../App/Src/app.c:146:12:app_get_brightness	0	static
+../App/Src/app.c:169:12:app_get_on_state	0	static
+../App/Src/app.c:53:5:app_get_info	16	static
+../App/Src/app.c:95:5:app_set_effect	8	static
+../App/Src/app.c:78:5:app_set_brightness	8	static
+../App/Src/app.c:121:5:app_set_color	48	static
+../App/Src/app.c:156:12:app_get_effect	16	static
+../App/Src/app.c:249:5:USART2_WriteData	8	static
+../App/Src/app.c:179:12:USB_CDC_Transmit_FS	8	static
+../App/Src/app.c:256:13:register_default_callback	8	static
+../App/Src/app.c:203:6:IRQ_buffer_push	0	static
+../App/Src/app.c:213:5:IRQ_buffer_pop	24	static
+../App/Src/app.c:238:6:USART2_IRQHandler	0	static
+../App/Src/app.c:271:6:app_init	64	static
+../App/Src/app.c:307:6:app_main_loop	104	static

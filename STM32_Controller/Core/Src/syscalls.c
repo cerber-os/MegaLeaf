@@ -10,13 +10,12 @@
  ******************************************************************************
  * @attention
  *
- * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
- * All rights reserved.</center></h2>
+ * Copyright (c) 2022 STMicroelectronics.
+ * All rights reserved.
  *
- * This software component is licensed by ST under BSD 3-Clause license,
- * the "License"; You may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
- *                        opensource.org/licenses/BSD-3-Clause
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
  *
  ******************************************************************************
  */
@@ -31,25 +30,15 @@
 #include <sys/time.h>
 #include <sys/times.h>
 
-#include "main.h"
 
 /* Variables */
-extern int __io_putchar(unsigned char ch) __attribute__((weak));
+extern int __io_putchar(int ch) __attribute__((weak));
 extern int __io_getchar(void) __attribute__((weak));
 
 
 char *__env[1] = { 0 };
 char **environ = __env;
 
-extern UART_HandleTypeDef hlpuart1;
-int __io_putchar(unsigned char ch) {
-	if(ch == '\n') {
-		ch = '\r';
-		HAL_UART_Transmit(&hlpuart1, &ch, 1, -1);
-		ch = '\n';
-	}
-	return HAL_UART_Transmit(&hlpuart1, &ch, 1, -1);
-}
 
 /* Functions */
 void initialise_monitor_handles()

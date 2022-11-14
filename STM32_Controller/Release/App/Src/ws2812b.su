@@ -1,0 +1,10 @@
+../App/Src/ws2812b.c:38:17:encode_byte	8	static
+../App/Src/ws2812b.c:54:13:clear_buffer	24	static
+../App/Src/ws2812b.c:64:5:init_led_strip	24	static
+../App/Src/ws2812b.c:85:5:get_leds_count	0	static
+../App/Src/ws2812b.c:89:6:set_led_color	40	static
+../App/Src/ws2812b.c:125:6:refresh_leds	8	static
+../App/Src/ws2812b.c:137:6:clear_leds	0	static
+../App/Src/ws2812b.c:141:6:set_leds_brightness	0	static
+../App/Src/ws2812b.c:145:6:calibrate_leds_colors	24	static
+../App/Src/ws2812b.c:160:14:int2Color	8	static

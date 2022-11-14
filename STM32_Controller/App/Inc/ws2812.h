@@ -7,7 +7,7 @@
 #ifndef INC_WS2812_H_
 #define INC_WS2812_H_
 
-#include <stm32l5xx_hal.h>
+#include <stm32f4xx_hal.h>
 
 /*
  * Exported structures
@@ -16,13 +16,23 @@ struct Color {
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
-} __packed;
+};
+
+struct Ratio {
+	uint8_t num;
+	uint8_t denum;
+};
 
 struct LEDStrip {
 	SPI_HandleTypeDef* spi;
 	uint32_t len;
 	uint8_t* _data_buffer;
 	uint8_t brightness;
+
+	// Used for correcting color differences between strips
+	uint8_t apply_ratio;
+	uint16_t ratio_index;
+	struct Ratio rt1_r, rt1_g, rt1_b, rt2_r, rt2_g, rt2_b;
 };
 
 /*
@@ -40,6 +50,7 @@ void set_led_color(struct LEDStrip* strip, int idx, struct Color color);
 void refresh_leds(struct LEDStrip* strip);
 void clear_leds(struct LEDStrip* strip);
 void set_leds_brightness(struct LEDStrip* strip, uint8_t brightness);
+void calibrate_leds_colors(struct LEDStrip* strip, struct Ratio r, struct Ratio g, struct Ratio b, uint16_t);
 
 struct Color int2Color(int color);
 

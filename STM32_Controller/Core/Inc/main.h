@@ -7,13 +7,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2022 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2022 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -28,11 +27,12 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32l5xx_hal.h"
+#include "stm32f4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "logger.h"
+#include "panic.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -58,28 +58,18 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define USER_BUTTON_Pin GPIO_PIN_13
-#define USER_BUTTON_GPIO_Port GPIOC
-#define VBUS_SENSE_Pin GPIO_PIN_2
-#define VBUS_SENSE_GPIO_Port GPIOC
-#define LED_BOTTOM_DATA_Pin GPIO_PIN_7
-#define LED_BOTTOM_DATA_GPIO_Port GPIOA
-#define UCPD_FLT_Pin GPIO_PIN_14
-#define UCPD_FLT_GPIO_Port GPIOB
-#define ST_LINK_VCP_TX_Pin GPIO_PIN_7
-#define ST_LINK_VCP_TX_GPIO_Port GPIOG
-#define ST_LINK_VCP_RX_Pin GPIO_PIN_8
-#define ST_LINK_VCP_RX_GPIO_Port GPIOG
-#define LED_GREEN_Pin GPIO_PIN_7
-#define LED_GREEN_GPIO_Port GPIOC
-#define LED_RED_Pin GPIO_PIN_9
-#define LED_RED_GPIO_Port GPIOA
-#define LED_UPPER_DATA_Pin GPIO_PIN_12
-#define LED_UPPER_DATA_GPIO_Port GPIOC
-#define UCPD_DBN_Pin GPIO_PIN_5
-#define UCPD_DBN_GPIO_Port GPIOB
-#define LED_BLUE_Pin GPIO_PIN_7
-#define LED_BLUE_GPIO_Port GPIOB
+#define ST_ESP_TX_Pin GPIO_PIN_2
+#define ST_ESP_TX_GPIO_Port GPIOA
+#define ST_ESP_RX_Pin GPIO_PIN_3
+#define ST_ESP_RX_GPIO_Port GPIOA
+#define STATUS_LED_Pin GPIO_PIN_1
+#define STATUS_LED_GPIO_Port GPIOB
+#define MCU_LDAT_BTM_Pin GPIO_PIN_15
+#define MCU_LDAT_BTM_GPIO_Port GPIOB
+#define ST_DBG_TX_Pin GPIO_PIN_6
+#define ST_DBG_TX_GPIO_Port GPIOB
+#define ST_DBG_RX_Pin GPIO_PIN_7
+#define ST_DBG_RX_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -283,7 +283,7 @@ int MLFProtoLib::_recvData(void* output, int outputLen, int* actualLen) {
 
     // Read header
     _read(&header, sizeof(header));
-    if(header.magic != MLF_HEADER_MAGIC)
+    if(header.magic != MLF_RESP_HEADER_MAGIC)
         throw MLFException("invalid header magic was received from MLF Controller");
 
     try {
@@ -461,7 +461,9 @@ MLF_handler MLFProtoLib_Init(char* path) {
         handle->exceptionMessage = NULL;
         return handle;
     }
-    catch (...) {
+    catch (std::exception& ex) {
+        fprintf(stderr, "[%s:%d] Failed to initialize library - error '%d'", 
+                __FILE__, __LINE__, ex.what());
         return NULL;
     }
 }

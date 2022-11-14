@@ -9,7 +9,7 @@
  * @brief 
  * 
  */
-class MLFException : std::exception {
+class MLFException : public std::exception {
 
     std::string message;
 

@@ -62,7 +62,7 @@ class MLFProto:
 
     def __del__(self):
         _MLF_LIBRARY.MLFProtoLib_Deinit(self._handle)
-    
+
     def _getError(self) -> str:
         return _MLF_LIBRARY.MLFProtoLib_GetError(self._handle)
 
@@ -108,8 +108,6 @@ count = controller.getLedsCount()
 print(f'FW version: {fw_version}')
 print(f'Leds count: {count[0]} and {count[1]}')
 
-controller.setEffect(2, 0, 0b11, 0x0550ff)
-# controller.setEffect(2,0,0b10,0xffffff)
-# controller.setEffect(2, 0, 0b11, 0xffffff)
-# controller.setEffect(0, 4)
-controller.setBrightness(60)
+controller.setEffect(0, 0, 0b11, 0x0550ff)
+controller.setBrightness(255)
+

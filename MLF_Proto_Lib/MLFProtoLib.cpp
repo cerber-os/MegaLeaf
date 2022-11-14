@@ -7,6 +7,8 @@
 #include "MLFProtoLib.hpp"
 #include "MLFProtoLib.h"
 
+#include "uapi/mlf_protocol_uapi.h"
+
 #include <fcntl.h>
 
 

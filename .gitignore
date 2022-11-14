@@ -2,4 +2,12 @@
 .vscode
 output/
 Debug/
+Release/
+*.o
 *.launch
+
+fp-info-cache
+MegaLeafPCB-backups/
+
+device_info.json
+onboarding_config.json

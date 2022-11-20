@@ -14,10 +14,10 @@ Texture2D<unorm float3> BufferIn : register(t0);
 RWStructuredBuffer<Pixel> BufferOut : register(u0);
 cbuffer ParamsStruct : register(b0)
 {
-    int width;
-    int height;
-    int targetWidth;
-    int unused;
+    uint width;
+    uint height;
+    uint targetWidth;
+    uint unused;
 };
 
 

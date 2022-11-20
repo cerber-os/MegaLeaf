@@ -1,10 +1,5 @@
 #include "AmbiLights.hpp"
 
-#include <iostream>
-
-#include <stdlib.h>
-#include <time.h>
-
 void AmbiLights::setError(std::string _err) {
 	err = _err;
 }
@@ -13,6 +8,10 @@ AmbiLights::AmbiLights() {
 	duo = NULL;
 	controller = NULL;
 	topLeds = bottomLeds = 0;
+
+	mutexHandle = CreateMutexA(NULL, false, NULL);
+	if (mutexHandle == NULL)
+		throw std::runtime_error("Failed to create mutex for AmbiLight class");
 }
 
 AmbiLights::~AmbiLights() {
@@ -21,20 +20,26 @@ AmbiLights::~AmbiLights() {
 
 	controller = NULL;
 	duo = NULL;
+
+	CloseHandle(mutexHandle);
 }
 
 bool AmbiLights::init() {
 	bool success;
 
 	// Setup communication with MegaLeaf controller
+	WaitForSingleObject(mutexHandle, INFINITE);
 	try {
 		controller = new MLFProtoLib();
 		controller->getLedsCount(topLeds, bottomLeds);
 	} catch(MLFException& ex) {
 		err = ex.what();
 		delete controller;
+
+		ReleaseMutex(mutexHandle);
 		return false;
 	}
+	ReleaseMutex(mutexHandle);
 
 	if (topLeds == 0 || bottomLeds == 0) {
 		setError("Failed to acquire number of leds from MLF controller");
@@ -52,12 +57,43 @@ bool AmbiLights::init() {
 }
 
 void AmbiLights::setBrightness(int level) {
+	WaitForSingleObject(mutexHandle, INFINITE);
+	
 	try {
-		controller->setBrightness(level);
+		if(controller)
+			controller->setBrightness(level);
 	}
 	catch (MLFException& ex) {
 		err = ex.what();
 	}
+	
+	ReleaseMutex(mutexHandle);
+}
+
+int AmbiLights::getBrightness(void) {
+	int result = -1;
+	WaitForSingleObject(mutexHandle, INFINITE);
+
+	try {
+		//if (controller)
+			//result = controller->getBrightness();
+		result = 255;
+	}
+	catch (MLFException& ex) {
+		err = ex.what();
+	}
+
+	ReleaseMutex(mutexHandle);
+	return result;
+}
+
+void AmbiLights::setState(eStates _state) {
+	if(_state >= 0 && _state < AMBI_STATE_MAX)
+		state = _state;
+}
+
+AmbiLights::eStates AmbiLights::getState(void) {
+	return state;
 }
 
 void AmbiLights::applyColorCorrections(long from, long to, size_t ledsCount) {
@@ -105,45 +141,99 @@ void AmbiLights::applyColorCorrections(long from, long to, size_t ledsCount) {
 	}
 }
 
-bool AmbiLights::runFrame(void) {
+bool AmbiLights::getFrame(void) {
 	bool success;
-	size_t screenWidth;
+	int maxRetries = 5;
 
-	success = duo->getScreen(screen);
-	if (!success) {
-		err = duo->getError();
+	do {
+		success = duo->getScreen(screen);
+		if (success)
+			return true;
+		
+		// Try to reconfigure whole DesktopDuplication API
+		duo->deinit();
+		success = duo->init();
+		if (!success)
+			break;
+	} while (maxRetries-- > 0);
+
+	// sth went so wrong that we cannot clone image frame even
+	//  after reconfiguring DDUAPI. Just switch to disable mode
+	//  at this point
+	setState(AMBI_STATE_OFF);
+
+	err = duo->getError();
+	return false;
+}
+
+bool AmbiLights::runFrame(void) {
+	size_t screenWidth;
+	bool ret = true;
+
+	if (!getFrame())
 		return false;
-	}
 	screenWidth = screen.size() / 2;
 
 	colors.clear();
 	applyColorCorrections(screenWidth, screenWidth * 2 - 1, bottomLeds);
 	applyColorCorrections(0, screenWidth - 1, topLeds);
 
+	WaitForSingleObject(mutexHandle, INFINITE);
 	try {
 		controller->setColors(colors.data(), colors.size());
 	}
 	catch (MLFException& ex) {
 		err = ex.what();
-		return false;
+		ret = false;
 	}
-	return true;
+	ReleaseMutex(mutexHandle);
+
+	return ret;
+}
+
+void AmbiLights::turnLEDsOff(void) {
+	WaitForSingleObject(mutexHandle, INFINITE);
+	try {
+		if(controller)
+			controller->turnOff();
+	}
+	catch (MLFException& ex) {
+		err = ex.what();
+	}
+	ReleaseMutex(mutexHandle);
 }
 
 void AmbiLights::run(void) {
-	size_t processedFrames = 0;
-	time_t t = time(NULL);
+	bool success;
+	eStates lState = AMBI_STATE_OFF, prevState;
 
 	while (1) {
-		runFrame();
+		prevState = lState;
+		lState = state;
+		if (lState == AMBI_STATE_OFF) {
+			if (prevState == AMBI_STATE_ON) {
+				duo->deinit();
+				turnLEDsOff();
+			}
 
-		processedFrames++;
-		if (time(NULL) - t) {
-			std::cout << "Processed " << processedFrames << " frames" << std::endl;
-			processedFrames = 0;
-			t = time(NULL);
+			Sleep(500);
+			continue;
 		}
+		else if (lState == AMBI_STATE_SHUTDOWN) {
+			break;
+		}
+		else if (lState == AMBI_STATE_ON) {
+			if (prevState == AMBI_STATE_OFF) {
+				success = duo->init();
+				if (!success)
+					setState(AMBI_STATE_OFF);
+			}
+		}
+
+		runFrame();
 	}
+
+	turnLEDsOff();
 }
 
 std::string& AmbiLights::getError(void) {

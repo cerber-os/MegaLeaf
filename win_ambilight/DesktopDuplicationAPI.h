@@ -49,6 +49,11 @@ public:
 	 */
 	bool init(void);
 
+	/* Automatically called from class destructor. To use class again,
+	 *  remember to invoke init() method
+	 */
+	void deinit(void);
+
 	/* Clear provided vector and fill it with average colors. The output
 	 *  vector has a size of screenWidth * 2 (i.e. stores average color of
 	 *  each half of each column on screen).

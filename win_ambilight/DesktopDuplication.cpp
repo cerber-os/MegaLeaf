@@ -107,20 +107,7 @@ DesktopDuplication::DesktopDuplication(void) {
 }
 
 DesktopDuplication::~DesktopDuplication(void) {
-	if (pCompShader)
-		pCompShader->Release();
-
-	if (pDXGIOutputDupl)
-		pDXGIOutputDupl->Release();
-
-	if (pDXGIOutput)
-		pDXGIOutput->Release();
-
-	if (pD3DDeviceContext)
-		pD3DDeviceContext->Release();
-
-	if (pD3DDevice)
-		pD3DDevice->Release();
+	deinit();
 }
 
 
@@ -173,6 +160,28 @@ bool DesktopDuplication::init(void) {
 		return false;
 
 	return CreateComputeShader();
+}
+
+void DesktopDuplication::deinit(void) {
+	if (pCompShader)
+		pCompShader->Release();
+	pCompShader = NULL;
+
+	if (pDXGIOutputDupl)
+		pDXGIOutputDupl->Release();
+	pDXGIOutputDupl = NULL;
+
+	if (pDXGIOutput)
+		pDXGIOutput->Release();
+	pDXGIOutput = NULL;
+
+	if (pD3DDeviceContext)
+		pD3DDeviceContext->Release();
+	pD3DDeviceContext = NULL;
+
+	if (pD3DDevice)
+		pD3DDevice->Release();
+	pD3DDevice = NULL;
 }
 
 bool DesktopDuplication::initOutputDuplication(void) {
@@ -299,10 +308,10 @@ bool DesktopDuplication::getScreen(std::vector<int>& screen) {
 	// Setup const buffer
 	ID3D11Buffer* pConstBuffer;
 	struct VS_CONSTANT_BUFFER {
-		int width;
-		int height;
-		int targetWidth;
-		int unused;
+		unsigned int width;
+		unsigned int height;
+		unsigned int targetWidth;
+		unsigned int unused;
 	};
 
 	struct VS_CONSTANT_BUFFER VsConstantBuf;

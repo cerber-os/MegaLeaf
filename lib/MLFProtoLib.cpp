@@ -177,6 +177,7 @@ static void ConfigureSerialPort(int fd) {
 #define read        ::_read
 #define write       ::_write
 #define close       ::_close
+#define strdup      ::_strdup
 
 #else
 

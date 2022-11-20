@@ -36,8 +36,8 @@ class MLFProtoLib {
     int  _appendCRC(int crc, void* data, int len);
     void _sendData(int cmd, void* data = nullptr, int len = 0);
     int  _recvData(void* output = NULL, int outputLen = 0, int* actualLen = 0);
-    int  invokeCmd(int cmd, void* data = nullptr, int len = 0);
-    int  invokeCmd(int cmd, void* data, int len, void* resp, int* respLen);
+    void invokeCmd(int cmd, void* data = nullptr, int len = 0);
+    void invokeCmd(int cmd, void* data, int len, void* resp, int* respLen);
 
     void errorToException(const char* message, int error);
 
@@ -48,8 +48,14 @@ public:
     void getFWVersion(int& version) const;
     void getLedsCount(int& top, int& bottom) const;
 
+    void turnOn(void);
     void turnOff(void);
+    int isTurnedOn(void);
+
     void setBrightness(int brightness);
     void setColors(int* colors, int len);
     void setEffect(int effect, int speed, int strip, int color);
+
+    int getBrightness(void);
+    void getEffect(int* effect, int* speed, int* color);
 };

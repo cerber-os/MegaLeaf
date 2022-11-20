@@ -315,24 +315,22 @@ int MLFProtoLib::_recvData(void* output, int outputLen, int* actualLen) {
     return header.error_code;
 }
 
-int MLFProtoLib::invokeCmd(int cmd, void* data, int len) {
+void MLFProtoLib::invokeCmd(int cmd, void* data, int len) {
     int ret;
 
     _sendData(cmd, data, len);
     ret = _recvData();
     if(ret != MLF_RET_OK)
         errorToException("contoller failed to process command", ret);
-    return ret;
 }
 
-int MLFProtoLib::invokeCmd(int cmd, void* data, int len, void* resp, int* respLen) {
+void MLFProtoLib::invokeCmd(int cmd, void* data, int len, void* resp, int* respLen) {
     int ret;
 
     _sendData(cmd, data, len);
     ret = _recvData(resp, *respLen, respLen);
     if(ret != MLF_RET_OK)
         errorToException("contoller failed to process command", ret);
-    return ret;
 }
 
 void MLFProtoLib::errorToException(const char* message, int error) {
@@ -403,9 +401,22 @@ void MLFProtoLib::getLedsCount(int& top, int& bottom) const {
     bottom = leds_count_bottom;
 }
 
+void MLFProtoLib::turnOn(void) {
+    invokeCmd(MLF_CMD_TURN_ON);
+}
 
 void MLFProtoLib::turnOff(void) {
     invokeCmd(MLF_CMD_TURN_OFF);
+}
+
+int MLFProtoLib::isTurnedOn(void) {
+    struct MLF_resp_cmd_get_on_state on_state;
+    int respLen = sizeof(on_state);
+
+    invokeCmd(MLF_CMD_GET_ON_STATE, nullptr, 0, &on_state, &respLen);
+    if(respLen < sizeof(on_state))
+        throw MLFException("Failed to request on_state - invalid response size");
+    return !!on_state.is_on;
 }
 
 void MLFProtoLib::setBrightness(int brightness) {
@@ -446,6 +457,32 @@ void MLFProtoLib::setEffect(int effect, int speed, int strip, int color) {
     invokeCmd(MLF_CMD_SET_EFFECT, &data, sizeof data);
 }
 
+int MLFProtoLib::getBrightness(void) {
+    struct MLF_resp_cmd_get_brightness data = {0};
+    int respLen = sizeof(data);
+
+    invokeCmd(MLF_CMD_GET_BRIGHTNESS, NULL, 0, &data, &respLen);
+    if(respLen < sizeof(data))
+        throw MLFException("Failed to get brightness - invalid response size");
+
+    return data.brightness;
+}
+
+void MLFProtoLib::getEffect(int* effect, int* speed, int* color) {
+    struct MLF_resp_cmd_get_effect data = {0};
+    int respLen = sizeof(data);
+
+    invokeCmd(MLF_CMD_GET_EFFECT, NULL, 0, &data, &respLen);
+    if(respLen < sizeof(data))
+        throw MLFException("Failed to get effect - invalid response size");
+    
+    if(effect)
+        *effect = data.effect;
+    if(speed)
+        *speed = data.speed;
+    if(color)
+        *color = data.color;
+}
 
 /************************************
  * C bindings
@@ -464,7 +501,7 @@ MLF_handler MLFProtoLib_Init(char* path) {
         return handle;
     }
     catch (std::exception& ex) {
-        fprintf(stderr, "[%s:%d] Failed to initialize library - error '%d'", 
+        fprintf(stderr, "[%s:%d] Failed to initialize library - error '%s'\n", 
                 __FILE__, __LINE__, ex.what());
         return NULL;
     }
@@ -507,6 +544,18 @@ void MLFProtoLib_GetLedsCount(MLF_handler handle, int* top, int* bottom) {
     }
 }
 
+int MLFProtoLib_TurnOn(MLF_handler handle) {
+    try {
+        handle->instance->turnOn();
+    } catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
+        return -1;
+    }
+    return 0;
+}
+
 int MLFProtoLib_TurnOff(MLF_handler handle) {
     try {
         handle->instance->turnOff();
@@ -518,6 +567,21 @@ int MLFProtoLib_TurnOff(MLF_handler handle) {
         handle->exceptionMessage = strdup(ex.what());
         return -1;
     }
+}
+
+int MLFProtoLib_IsTurnedOn(MLF_handler handle) {
+    int result;
+
+    try {
+        result = handle->instance->isTurnedOn();
+    } catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
+        return -1;
+    }
+
+    return result;
 }
 
 int MLFProtoLib_SetBrightness(MLF_handler handle, int val) {
@@ -557,6 +621,31 @@ int MLFProtoLib_SetEffect(MLF_handler handle, int effect, int speed, int strip, 
         handle->exceptionMessage = strdup(ex.what());
         return -1;
     }
+}
+
+int MLFProtoLib_GetBrightness(MLF_handler handle) {
+    int result;
+    try {
+        result = handle->instance->getBrightness();
+    } catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
+        return -1;
+    }
+    return result;
+}
+
+int MLFProtoLib_GetEffect(MLF_handler handle, int* effect, int* speed, int* color) {
+    try {
+        handle->instance->getEffect(effect, speed, color);
+    } catch (std::exception& ex) {
+        if(handle->exceptionMessage)
+            free((void*) handle->exceptionMessage);
+        handle->exceptionMessage = strdup(ex.what());
+        return -1;
+    }
+    return 0;
 }
 
 const char* MLFProtoLib_GetError(MLF_handler handle) {

@@ -146,7 +146,7 @@ int app_set_color(uint8_t* data, uint16_t len, uint8_t* resp, uint16_t* resp_len
 static int app_get_brightness(uint8_t* data, uint16_t len, uint8_t* resp, uint16_t* resp_len) {
 	struct MLF_resp_cmd_get_brightness bright;
 
-	bright.brightness = led_strip_bottom->brightness / 2 + led_strip_upper->brightness / 2;
+	bright.brightness = ((uint16_t)led_strip_bottom->brightness + (uint16_t)led_strip_upper->brightness) / 2;
 
 	memcpy(resp, &bright, sizeof bright);
 	*resp_len = sizeof bright;

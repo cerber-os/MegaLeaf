@@ -107,8 +107,8 @@ static int effect_bar_cycle(struct LEDStrip* strip, uint32_t frame, uint32_t dat
 	color.g = (data >> 8) & 0xff;
 	color.b = (data >> 16) & 0xff;
 
-	pos = frame % 100;
-	pos /= leds_count;
+	pos = (frame / 8) % 100;
+	pos = pos * leds_count / 100;
 	width = leds_count / 5;
 
 	for(i = 0; i < pos; i++)

@@ -22,7 +22,7 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{06fee416-dd27-4647-ad36-0174b208b828}</ProjectGuid>
-    <RootNamespace>DDUPAPITest</RootNamespace>
+    <RootNamespace>AmbiLights</RootNamespace>
     <ProjectName>AmbiLights</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

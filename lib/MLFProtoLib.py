@@ -3,7 +3,7 @@
 """
 
 from ctypes import *
-from typing import Tuple
+from typing import Final, Tuple
 
 __author__ = 'Pawel Wieczorek'
 
@@ -64,6 +64,7 @@ _MLF_LIBRARY.MLFProtoLib_GetEffect.argtypes = [c_void_p, c_void_p, c_void_p, c_v
 _MLF_LIBRARY.MLFProtoLib_GetError.resType = c_char_p
 _MLF_LIBRARY.MLFProtoLib_GetError.argtypes = [c_void_p]
 
+
 ################################
 # Wrapper for Cpp class
 ################################
@@ -122,7 +123,7 @@ class MLFProto:
             raise MLFException("Failed to change color of MLF panel" + self._getError())
 
 
-    def setEffect(self, effect: int, speed: int = 0, strip: int = 0b11, color: int = 0):
+    def setEffect(self, effect: 'MLFEffect', speed: int = 0, strip: int = 0b11, color: int = 0):
         ret = _MLF_LIBRARY.MLFProtoLib_SetEffect(self._handle, effect, speed, strip, color)
         if ret != 0:
             raise MLFException("Failed to set effect on MLF panel" + self._getError())
@@ -144,16 +145,35 @@ class MLFProto:
         return (effect.value, speed.value, color.value)
 
 
-# Test area
-controller = MLFProto()
-fw_version = controller.getFWVersion()
-count = controller.getLedsCount()
-print(f'FW version: {fw_version}')
-print(f'Leds count: {count[0]} and {count[1]}')
+class MLFEffect:
+    STATIC_COLOR: Final[int]    = 0
+    FADING: Final[int]          = 1
+    RAINBOW: Final[int]         = 2
+    PROGRESS_BAR: Final[int]    = 3
 
-controller.setEffect(0, 0, 0b11, 0x0550ff)
-controller.setBrightness(213)
+################################
+# Example usage of lib
+################################
+def example():
+    print(f'Establishing connection with MegaLeaf')
+    controller = MLFProto()
+    fw_version = controller.getFWVersion()
+    count = controller.getLedsCount()
+    print(f'FW version: {fw_version}')
+    print(f'Leds count: {count[0]} and {count[1]}')
 
-print("Brightness: ", controller.getBrightness())
-print("Effect: ", controller.getEffect())
+    print(f'Enabling static color effect')
+    controller.setEffect(MLFEffect.STATIC_COLOR, 0, 0b11, 0x0550ff)
+    controller.setBrightness(213)
 
+    print(f'Set values:')
+    print("Brightness:", controller.getBrightness())
+    print("Effect:", controller.getEffect())
+
+    print(f'DONE')
+
+if __name__ == '__main__':
+    try:
+        example()
+    except MLFException as e:
+        print(f"An error occurred: {repr(e)}")

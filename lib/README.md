@@ -1,6 +1,6 @@
 # MegaLeaf protocol library
 
-C++ library providing easy to use interface for interacting with MegaLeaf Controller over USB CDC protocol. Bindings exists for both C and Python as well.
+C++ library providing easy to use interface for interacting with MegaLeaf Controller over USB CDC protocol. Bindings exists for both C and Python.
 
 # Building
 
@@ -11,10 +11,10 @@ mkdir -p output
 cd output
 cmake ..
 cmake --build -j8 .
-cmake --install -j8 .
+cmake --install .
 ```
 
-After executing this commands, you should end up with `libMLFProtoLib.so` file.
+After executing these commands, you should end up with `libMLFProtoLib.so` shared library file.
 
 # Examples
 Simple Python application enabling rainbow effect on LED panel and setting brightness to 50%
@@ -85,5 +85,4 @@ exit:
     MLFProtoLib_Deinit(handler);
     return ret;
 }
-
 ```

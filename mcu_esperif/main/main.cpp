@@ -147,19 +147,22 @@ static int MLF_RecvTurnOff(uint8_t* data, uint16_t size, uint8_t* resp, uint16_t
 }
 
 static int MLF_RecvSetBrightness(uint8_t* data, uint16_t size, uint8_t* resp, uint16_t* resp_size) {
-    struct MLF_req_cmd_set_brightness* bright = NULL;
+    struct MLF_req_cmd_set_brightness* bright = (struct MLF_req_cmd_set_brightness*) data;
+    uint16_t scaled;
     
     if(size < sizeof(*bright)) {
         ESP_LOGE("app", "%s: incorrect request size received - %d (expected: %d)", __func__, size, sizeof(*bright));
         return MLF_RET_INVALID_DATA;
     }
-    capLevel->setValue(bright->brightness);
+
+    scaled = (uint16_t)bright->brightness * 100 / 255;
+    capLevel->setValue(scaled);
 
     return MLF_RET_OK;
 }
 
 static int MLF_RecvSetEffect(uint8_t* data, uint16_t size, uint8_t* resp, uint16_t* resp_size) {
-    struct MLF_req_cmd_set_effect* effect = NULL;
+    struct MLF_req_cmd_set_effect* effect = (struct MLF_req_cmd_set_effect*) data;
     
     if(size < sizeof(*effect)) {
         ESP_LOGE("app", "%s: incorrect request size received - %d (expected: %d)", __func__, size, sizeof(*effect));

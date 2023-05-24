@@ -151,7 +151,7 @@ void MLF_Comm_init(void) {
 
     xEvResponseAvail = xEventGroupCreate();
 
-    xTaskCreate(mlf_uart_event_task, "mlf_uart_event_task", 2048, NULL, 12, NULL);
+    xTaskCreate(mlf_uart_event_task, "mlf_uart_event_task", 6144, NULL, 12, NULL);
 
     MLF_register_callback(&mlf_ctx, MLF_CMD_HANDLE_RESPONSE, mlf_response_handler);
 }
@@ -238,6 +238,7 @@ int MLF_Comm_TurnOn(void) {
 int MLF_Comm_GetBrightness(uint16_t* brightness) {
     uint8_t resp[MLF_RESP_CMD_GET_BRIGHTNESS_LEN];
     size_t resp_size = sizeof(resp);
+    uint16_t tmp;
 
     MLF_Comm_sendCmd(MLF_CMD_GET_BRIGHTNESS, NULL, 0, resp, &resp_size);
     if(resp_size < sizeof(resp)) {
@@ -245,9 +246,11 @@ int MLF_Comm_GetBrightness(uint16_t* brightness) {
         return MLF_RET_INVALID_HEADER;
     }
 
-    struct MLF_resp_cmd_get_brightness* resp_bright = resp;
-    *brightness = resp_bright->brightness;
+    struct MLF_resp_cmd_get_brightness* resp_bright = (struct MLF_resp_cmd_get_brightness*) resp;
+    tmp = resp_bright->brightness;
 
+    // Scale brightness to range 0-100
+    *brightness = tmp * 100 / 255;
     return 0;
 }
 
@@ -261,7 +264,7 @@ int MLF_Comm_GetEffect(uint16_t* effect, uint16_t* speed, uint32_t* color) {
         return MLF_RET_INVALID_HEADER;
     }
 
-    struct MLF_resp_cmd_get_effect* resp_effect = resp;
+    struct MLF_resp_cmd_get_effect* resp_effect = (struct MLF_resp_cmd_get_effect*) resp;
     if(effect) *effect = resp_effect->effect;
     if(speed) *speed = resp_effect->speed;
     if(color) *color = resp_effect->color;
@@ -278,7 +281,7 @@ int MLF_Comm_GetOnState(uint8_t* on_state) {
         return MLF_RET_INVALID_HEADER;
     }
 
-    struct MLF_resp_cmd_get_on_state* resp_state = resp;
+    struct MLF_resp_cmd_get_on_state* resp_state = (struct MLF_resp_cmd_get_on_state*) resp;
     if(on_state)
         *on_state = !!resp_state->is_on;    
     return 0;

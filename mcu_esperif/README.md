@@ -8,8 +8,9 @@ TODO: Photo from smarthings app
 
 Project uses generic ESP32C3 subboard, equipped with Xtensa ESP32 microcontroller. 
 
-The communication between Esperif and STM32 is concluded over USART interface.
-TODO: Ellaborate
+The communication between Esperif and STM32 is concluded over USART interface. Both microcontrollers shares information with each other - Esperif notifies STM32 about changes comming from SmartThings cloud and STM32 shares events triggered by PC software via USB interface.
+
+Firmware for ESP32 coprocessor uses official Samsung's SmartThing library for intercating with IoT cloud.
 
 ## Building
 
@@ -30,6 +31,8 @@ To flash built project issue:
 ```
 python build.py apps/esp32/mcu_esperif flash
 ```
+
+Alternatively, you could download standalone library for SmartThings connection, built it and link with this project, but the above approach is much simpler and faster as it uses already prebuilt files.
 
 ## Creating SmartThings device
 

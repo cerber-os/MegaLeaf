@@ -30,6 +30,7 @@ private:
 	void handleEvents(void);
 	bool getFrame(void);
 	bool runFrame(void);
+	void turnLEDsOn(void);
 	void turnLEDsOff(void);
 
 	/* Multi-thread support */ 

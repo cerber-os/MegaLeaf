@@ -191,6 +191,18 @@ bool AmbiLights::runFrame(void) {
 	return ret;
 }
 
+void AmbiLights::turnLEDsOn(void) {
+	WaitForSingleObject(mutexHandle, INFINITE);
+	try {
+		if(controller)
+			controller->turnOn();
+	}
+	catch (MLFException& ex) {
+		err = ex.what();
+	}
+	ReleaseMutex(mutexHandle);
+}
+
 void AmbiLights::turnLEDsOff(void) {
 	WaitForSingleObject(mutexHandle, INFINITE);
 	try {
@@ -227,6 +239,7 @@ void AmbiLights::run(void) {
 				success = duo->init();
 				if (!success)
 					setState(AMBI_STATE_OFF);
+				turnLEDsOn();
 			}
 		}
 

@@ -207,7 +207,7 @@ int MLF_Comm_SetBrightness(uint16_t brightness) {
 }
 
 int MLF_Comm_SetEffect(uint8_t mode, uint8_t speed, uint8_t strip, uint32_t color) {
-    ESP_LOGI(TAG, "MLF_COMM - setting effect to %d-%d-%d", mode, speed, color);
+    ESP_LOGI(TAG, "MLF_COMM - setting effect to %u-%u-%lu", mode, speed, color);
 
     struct MLF_req_cmd_set_effect effect = {
         .effect = mode,

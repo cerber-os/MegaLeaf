@@ -278,7 +278,7 @@ static int MLF_validate_footer(struct MLF_ctx* ctx, uint8_t* buf) {
 	footer = (struct MLF_packet_footer*)(buf + sizeof(*pkt) + pkt->data_size);
 
 	if(footer->magic != MLF_FOOTER_MAGIC) {
-		LOG_ERROR("Footer with invalid magic was received - received [%x]; expected [%lx]",
+		LOG_ERROR("Footer with invalid magic was received - received [%lx]; expected [%lx]",
 					footer->magic, MLF_FOOTER_MAGIC);
 		MLF_resp_error(ctx, MLF_RET_INVALID_FOOTER);
 		return 1;

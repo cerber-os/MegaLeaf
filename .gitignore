@@ -5,9 +5,14 @@ Debug/
 Release/
 *.o
 *.launch
+*.lock
+*.old
 
 fp-info-cache
 MegaLeafPCB-backups/
 
 device_info.json
 onboarding_config.json
+
+build/
+managed_components/
